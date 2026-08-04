@@ -27,6 +27,7 @@
    [frontend-tests.data.workspace-texts-test]
    [frontend-tests.data.workspace-thumbnails-test]
    [frontend-tests.errors-test]
+   [frontend-tests.fonts-test]
    [frontend-tests.helpers-shapes-test]
    [frontend-tests.logic.comp-remove-swap-slots-test]
    [frontend-tests.logic.components-and-tokens]
@@ -124,6 +125,7 @@
    'frontend-tests.data.workspace-texts-test
    'frontend-tests.data.workspace-thumbnails-test
    'frontend-tests.errors-test
+   'frontend-tests.fonts-test
    'frontend-tests.helpers-shapes-test
    'frontend-tests.logic.comp-remove-swap-slots-test
    'frontend-tests.logic.components-and-tokens
