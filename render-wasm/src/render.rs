@@ -2995,6 +2995,87 @@ impl RenderState {
         ))
     }
 
+    /// Renders descendant silhouettes into the current drop-shadow layer.
+    #[allow(clippy::too_many_arguments)]
+    fn render_drop_shadow_child_silhouettes(
+        &mut self,
+        element: &Shape,
+        tree: ShapesPoolRef,
+        shadow: &Shadow,
+        scale: f32,
+        inherited_layer_blur: Option<Blur>,
+        node_render_state: &NodeRenderState,
+        target_surface: SurfaceId,
+    ) -> Result<()> {
+        if matches!(element.shape_type, Type::Bool(_)) {
+            return Ok(());
+        }
+
+        let shadow_children = if element.is_recursive() {
+            get_simplified_children(tree, element)
+        } else {
+            Vec::new()
+        };
+
+        for shadow_shape_id in shadow_children.iter() {
+            let Some(shadow_shape) = tree.get(shadow_shape_id) else {
+                continue;
+            };
+            if shadow_shape.hidden {
+                continue;
+            }
+
+            let nested_clip_bounds =
+                node_render_state.get_nested_shadow_clip_bounds(element, shadow);
+
+            if !matches!(shadow_shape.shape_type, Type::Text(_)) {
+                self.render_drop_black_shadow(
+                    shadow_shape,
+                    &shadow_shape.extrect(tree, scale),
+                    shadow,
+                    nested_clip_bounds,
+                    scale,
+                    inherited_layer_blur,
+                    target_surface,
+                )?;
+            } else {
+                let paint = skia::Paint::default();
+                let layer_rec = skia::canvas::SaveLayerRec::default().paint(&paint);
+                self.surfaces
+                    .canvas(SurfaceId::DropShadows)
+                    .save_layer(&layer_rec);
+
+                let mut transformed_shadow: Cow<Shadow> = Cow::Borrowed(shadow);
+                transformed_shadow.to_mut().color = skia::Color::BLACK;
+                transformed_shadow.to_mut().blur = transformed_shadow.blur;
+                transformed_shadow.to_mut().spread = transformed_shadow.spread;
+
+                let mut new_shadow_paint = skia::Paint::default();
+                new_shadow_paint.set_image_filter(transformed_shadow.get_drop_shadow_filter());
+                new_shadow_paint.set_blend_mode(skia::BlendMode::SrcOver);
+
+                self.with_nested_blurs_suppressed(|state| {
+                    state.render_shape(
+                        shadow_shape,
+                        nested_clip_bounds,
+                        SurfaceId::DropShadows,
+                        SurfaceId::DropShadows,
+                        SurfaceId::DropShadows,
+                        SurfaceId::DropShadows,
+                        true,
+                        None,
+                        Some(vec![new_shadow_paint.clone()]),
+                        None,
+                        target_surface,
+                    )
+                })?;
+                self.surfaces.canvas(SurfaceId::DropShadows).restore();
+            }
+        }
+
+        Ok(())
+    }
+
     /// Renders a drop shadow effect for the given shape.
     ///
     /// Creates a black shadow by converting the original shadow color to black,
@@ -3254,6 +3335,8 @@ impl RenderState {
         };
 
         let recursive = element.is_recursive();
+        let use_direct_container_shadow =
+            element.uses_direct_container_drop_shadow(tree, scale);
         let mut rendered_any = false;
         for shadow in element.drop_shadows_visible() {
             if !shadow.is_perceptible_at_scale_for(scale, recursive) {
@@ -3266,79 +3349,36 @@ impl RenderState {
                 .canvas(SurfaceId::DropShadows)
                 .save_layer(&layer_rec);
 
-            self.render_drop_black_shadow(
-                element,
-                element_extrect,
-                shadow,
-                clip_bounds.clone(),
-                scale,
-                None,
-                target_surface,
-            )?;
-
-            if !matches!(element.shape_type, Type::Bool(_)) {
-                let shadow_children = if element.is_recursive() {
-                    get_simplified_children(tree, element)
-                } else {
-                    Vec::new()
-                };
-
-                for shadow_shape_id in shadow_children.iter() {
-                    let Some(shadow_shape) = tree.get(shadow_shape_id) else {
-                        continue;
-                    };
-                    if shadow_shape.hidden {
-                        continue;
-                    }
-
-                    let nested_clip_bounds =
-                        node_render_state.get_nested_shadow_clip_bounds(element, shadow);
-
-                    if !matches!(shadow_shape.shape_type, Type::Text(_)) {
-                        self.render_drop_black_shadow(
-                            shadow_shape,
-                            &shadow_shape.extrect(tree, scale),
-                            shadow,
-                            nested_clip_bounds,
-                            scale,
-                            inherited_layer_blur,
-                            target_surface,
-                        )?;
-                    } else {
-                        let paint = skia::Paint::default();
-                        let layer_rec = skia::canvas::SaveLayerRec::default().paint(&paint);
-                        self.surfaces
-                            .canvas(SurfaceId::DropShadows)
-                            .save_layer(&layer_rec);
-
-                        let mut transformed_shadow: Cow<Shadow> = Cow::Borrowed(shadow);
-                        transformed_shadow.to_mut().color = skia::Color::BLACK;
-                        transformed_shadow.to_mut().blur = transformed_shadow.blur;
-                        transformed_shadow.to_mut().spread = transformed_shadow.spread;
-
-                        let mut new_shadow_paint = skia::Paint::default();
-                        new_shadow_paint
-                            .set_image_filter(transformed_shadow.get_drop_shadow_filter());
-                        new_shadow_paint.set_blend_mode(skia::BlendMode::SrcOver);
-
-                        self.with_nested_blurs_suppressed(|state| {
-                            state.render_shape(
-                                shadow_shape,
-                                nested_clip_bounds,
-                                SurfaceId::DropShadows,
-                                SurfaceId::DropShadows,
-                                SurfaceId::DropShadows,
-                                SurfaceId::DropShadows,
-                                true,
-                                None,
-                                Some(vec![new_shadow_paint.clone()]),
-                                None,
-                                target_surface,
-                            )
-                        })?;
-                        self.surfaces.canvas(SurfaceId::DropShadows).restore();
-                    }
-                }
+            // Fast path: frame geometry + blur, no filter surface or child silhouettes.
+            if use_direct_container_shadow {
+                shadows::render_frame_container_drop_shadow(
+                    self,
+                    element,
+                    element_extrect,
+                    shadow,
+                    clip_bounds.clone(),
+                    scale,
+                    target_surface,
+                )?;
+            } else {
+                self.render_drop_black_shadow(
+                    element,
+                    element_extrect,
+                    shadow,
+                    clip_bounds.clone(),
+                    scale,
+                    None,
+                    target_surface,
+                )?;
+                self.render_drop_shadow_child_silhouettes(
+                    element,
+                    tree,
+                    shadow,
+                    scale,
+                    inherited_layer_blur,
+                    node_render_state,
+                    target_surface,
+                )?;
             }
 
             let mut paint = skia::Paint::default();

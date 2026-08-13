@@ -1843,6 +1843,64 @@ impl Shape {
             .any(|s| s.render_kind(is_open) == StrokeKind::Inner)
     }
 
+    /// When true, the frame drop shadow can use `render_frame_container_drop_shadow`
+    /// (direct geometry + blur) instead of filter surfaces and descendant silhouettes.
+    ///
+    /// Requires at least one fill; fill opacity/type does not matter because the fast
+    /// path shadows the frame geometry as a solid mask.
+    pub fn uses_direct_container_drop_shadow(&self, tree: ShapesPoolRef, scale: f32) -> bool {
+        if !matches!(self.shape_type, Type::Frame(_)) {
+            return false;
+        }
+        if !self.has_fills() {
+            return false;
+        }
+        if self.blend_mode() != BlendMode::default() {
+            return false;
+        }
+        if !self.transform.is_identity() || !math::is_close_to(self.rotation, 0.0) {
+            return false;
+        }
+        if self.blur.is_some() || self.background_blur.is_some() {
+            return false;
+        }
+        if self.has_frame_clip_layer_blur() {
+            return false;
+        }
+
+        self.descendants_contained_for_frame_shadow(tree, scale, self.selrect())
+    }
+
+    fn descendants_contained_for_frame_shadow(
+        &self,
+        tree: ShapesPoolRef,
+        scale: f32,
+        bounds: math::Rect,
+    ) -> bool {
+        const MARGIN: f32 = 0.5;
+        for child_id in self.children_ids_iter(false) {
+            let Some(child) = tree.get(child_id) else {
+                continue;
+            };
+            if child.hidden {
+                continue;
+            }
+            if child.drop_shadows_visible().next().is_some() {
+                return false;
+            }
+            let child_extrect = child.extrect(tree, scale);
+            if !rect_contains_with_margin(bounds, child_extrect, MARGIN) {
+                return false;
+            }
+            if child.is_recursive()
+                && !child.descendants_contained_for_frame_shadow(tree, scale, bounds)
+            {
+                return false;
+            }
+        }
+        true
+    }
+
     pub fn drop_shadow_paints(&self) -> Vec<skia_safe::Paint> {
         let drop_shadows: Vec<&Shadow> = self.drop_shadows_visible().collect();
 
@@ -1870,6 +1928,14 @@ impl Shape {
             })
             .collect()
     }
+}
+
+#[inline]
+fn rect_contains_with_margin(outer: math::Rect, inner: math::Rect, margin: f32) -> bool {
+    inner.left >= outer.left - margin
+        && inner.top >= outer.top - margin
+        && inner.right <= outer.right + margin
+        && inner.bottom <= outer.bottom + margin
 }
 
 #[cfg(test)]
@@ -2011,5 +2077,46 @@ mod tests {
         assert_eq!(extrect.top, 0.0);
         assert_eq!(extrect.right, 50.0);
         assert_eq!(extrect.bottom, 50.0);
+    }
+
+    fn frame_with_fill_and_child(fill: Fill, opacity: f32) -> (ShapesPool, Uuid) {
+        let mut pool = ShapesPool::new();
+        pool.initialize(2);
+
+        let frame_id = Uuid::new_v4();
+        let child_id = Uuid::new_v4();
+
+        {
+            let frame = pool.add_shape(frame_id);
+            frame.set_shape_type(Type::Frame(Frame::default()));
+            frame.set_selrect(0.0, 0.0, 200.0, 100.0);
+            frame.add_fill(fill);
+            frame.opacity = opacity;
+            frame.children = vec![child_id];
+        }
+
+        {
+            let child = pool.add_shape(child_id);
+            child.set_shape_type(Type::Rect(Rect::default()));
+            child.set_selrect(10.0, 10.0, 180.0, 80.0);
+            child.set_parent(frame_id);
+        }
+
+        (pool, frame_id)
+    }
+
+    #[test]
+    fn frame_with_any_fill_uses_direct_container_drop_shadow() {
+        for (fill, opacity) in [
+            (Fill::Solid(SolidColor(skia::Color::WHITE)), 1.0),
+            (
+                Fill::Solid(SolidColor(skia::Color::from_argb(128, 255, 255, 255))),
+                0.5,
+            ),
+        ] {
+            let (pool, frame_id) = frame_with_fill_and_child(fill, opacity);
+            let frame = pool.get(&frame_id).expect("frame");
+            assert!(frame.uses_direct_container_drop_shadow(&pool, 1.0));
+        }
     }
 }

@@ -1,10 +1,91 @@
-use super::{RenderState, SurfaceId};
+use super::{ClipStack, RenderState, SurfaceId};
 use crate::render::strokes;
 use crate::shapes::{ParagraphBuilderGroup, Shadow, Shape, Stroke, StrokeKind, TextContent, Type};
-use skia_safe::{canvas::SaveLayerRec, Paint, Path};
+use skia_safe::{canvas::SaveLayerRec, self as skia, Paint, Path, Rect};
 
 use crate::error::Result;
 use crate::render::text;
+use crate::shapes::radius_to_sigma;
+
+/// Fast frame drop shadow: draw frame geometry on `DropShadows` with blur,
+/// skipping filter surfaces and descendant silhouettes.
+pub(crate) fn render_frame_container_drop_shadow(
+    state: &mut RenderState,
+    frame: &Shape,
+    shape_bounds: &Rect,
+    shadow: &Shadow,
+    clip_bounds: Option<ClipStack>,
+    scale: f32,
+    target_surface: SurfaceId,
+) -> Result<()> {
+    debug_assert!(matches!(frame.shape_type, Type::Frame(_)));
+
+    let mut shadow_for_cull = *shadow;
+    shadow_for_cull.color = skia::Color::BLACK;
+    shadow_for_cull.offset = (0.0, 0.0);
+    let Some(drop_filter) = shadow_for_cull.get_drop_shadow_filter() else {
+        return Ok(());
+    };
+
+    let mut bounds = drop_filter.compute_fast_bounds(*shape_bounds);
+    bounds.offset((shadow.offset.0, shadow.offset.1));
+    if !bounds.intersects(state.render_area_with_margins) && target_surface != SurfaceId::Export {
+        return Ok(());
+    }
+
+    let antialias = !state.options.is_fast_mode()
+        && frame.should_use_antialias(scale, state.options.antialias_threshold);
+
+    let blur_only_filter = if shadow.blur > 0.0 {
+        let sigma = radius_to_sigma(shadow.blur);
+        Some(skia::image_filters::blur((sigma, sigma), None, None, None))
+    } else {
+        None
+    };
+
+    let mut layer_paint = skia::Paint::default();
+    if let Some(blur_filter) = blur_only_filter {
+        layer_paint.set_image_filter(blur_filter);
+    }
+    layer_paint.set_blend_mode(skia::BlendMode::SrcOver);
+    let layer_rec = skia::canvas::SaveLayerRec::default().paint(&layer_paint);
+
+    if let Some(clips) = clip_bounds.as_ref() {
+        state.surfaces.canvas(SurfaceId::DropShadows).save();
+        state.clip_target_surface_to_stack(clips, SurfaceId::DropShadows, scale, antialias);
+    }
+
+    state.surfaces.canvas(SurfaceId::DropShadows).save();
+    state
+        .surfaces
+        .canvas(SurfaceId::DropShadows)
+        .translate((shadow.offset.0, shadow.offset.1));
+    state
+        .surfaces
+        .canvas(SurfaceId::DropShadows)
+        .save_layer(&layer_rec);
+
+    let mut fill_paint = skia::Paint::default();
+    fill_paint.set_color(skia::Color::BLACK);
+    fill_paint.set_anti_alias(antialias);
+    let spread = shadow.spread;
+    state.surfaces.draw_rect_to(
+        SurfaceId::DropShadows,
+        frame,
+        &fill_paint,
+        Some(spread).filter(|&s| s > 0.0),
+        None,
+    );
+
+    state.surfaces.canvas(SurfaceId::DropShadows).restore();
+    state.surfaces.canvas(SurfaceId::DropShadows).restore();
+
+    if clip_bounds.is_some() {
+        state.surfaces.canvas(SurfaceId::DropShadows).restore();
+    }
+
+    Ok(())
+}
 
 // Fill Shadows
 pub fn render_fill_inner_shadows(
