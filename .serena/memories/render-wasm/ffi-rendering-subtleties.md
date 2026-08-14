@@ -25,3 +25,5 @@
 - Pending tile priority is intentionally reversed by pop order; check the queue construction before changing tile scheduling.
 - Frames with a fill may use `render_frame_container_drop_shadow` (direct rrect +
   blur saveLayer on `DropShadows`) when `uses_direct_container_drop_shadow` is true.
+  The blur saveLayer uses tight bounds from `compute_fast_bounds` to avoid
+  full-surface offscreen allocation.

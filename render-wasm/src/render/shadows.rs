@@ -36,7 +36,8 @@ pub(crate) fn render_frame_container_drop_shadow(
     let antialias = !state.options.is_fast_mode()
         && frame.should_use_antialias(scale, state.options.antialias_threshold);
 
-    let blur_only_filter = if shadow.blur > 0.0 {
+    let has_blur = shadow.blur > 0.0;
+    let blur_only_filter = if has_blur {
         let sigma = radius_to_sigma(shadow.blur);
         Some(skia::image_filters::blur((sigma, sigma), None, None, None))
     } else {
@@ -48,7 +49,6 @@ pub(crate) fn render_frame_container_drop_shadow(
         layer_paint.set_image_filter(blur_filter);
     }
     layer_paint.set_blend_mode(skia::BlendMode::SrcOver);
-    let layer_rec = skia::canvas::SaveLayerRec::default().paint(&layer_paint);
 
     if let Some(clips) = clip_bounds.as_ref() {
         state.surfaces.canvas(SurfaceId::DropShadows).save();
@@ -60,6 +60,14 @@ pub(crate) fn render_frame_container_drop_shadow(
         .surfaces
         .canvas(SurfaceId::DropShadows)
         .translate((shadow.offset.0, shadow.offset.1));
+    let layer_bounds = drop_filter.compute_fast_bounds(*shape_bounds);
+    let layer_rec = if has_blur {
+        skia::canvas::SaveLayerRec::default()
+            .bounds(&layer_bounds)
+            .paint(&layer_paint)
+    } else {
+        skia::canvas::SaveLayerRec::default().paint(&layer_paint)
+    };
     state
         .surfaces
         .canvas(SurfaceId::DropShadows)
