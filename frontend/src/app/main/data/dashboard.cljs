@@ -23,6 +23,7 @@
    [app.main.data.helpers :as dsh]
    [app.main.data.modal :as modal]
    [app.main.data.notifications :as ntf]
+   [app.main.data.profile :as dp]
    [app.main.data.team :as dtm]
    [app.main.data.websocket :as dws]
    [app.main.repo :as rp]
@@ -35,6 +36,28 @@
    [potok.v2.core :as ptk]))
 
 (log/set-level! :warn)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Deleted organization notices
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defn- consume-deleted-organization-notices
+  []
+  (ptk/reify ::consume-deleted-organization-notices
+    ptk/WatchEvent
+    (watch [_ state _]
+      (when (contains? cf/flags :admin-console)
+        (when-let [orgs (dm/get-in state [:profile :props :deleted-organizations])]
+          (when (seq orgs)
+            (rx/concat
+             (rx/from (map #(ntf/show {:content (tr "dashboard.organization-deleted" %)
+                                       :type    :toast
+                                       :level   :info
+                                       :timeout nil})
+                           orgs))
+             (rx/of (dp/update-profile-props {:deleted-organizations nil})
+                    ;; Also fetch teams to ensure they're up-to-date after org deletion
+                    (dtm/fetch-teams)))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Initialization
@@ -55,7 +78,8 @@
 
         (->> (rx/merge
               (rx/of (fetch-projects team-id)
-                     (df/fetch-fonts team-id))
+                     (df/fetch-fonts team-id)
+                     (consume-deleted-organization-notices))
               (->> stream
                    (rx/filter (ptk/type? ::dws/message))
                    (rx/map deref)
@@ -725,8 +749,10 @@
              (rx/of (ntf/show {:content (tr "dashboard.organization-deleted" organization-name)
                                :type :toast
                                :level :info
-                               :timeout nil})))
-           (when fetch? ;; If the user belonged to the organization
+                               :timeout nil})
+                    (dp/update-profile-props {:deleted-organizations nil})))
+
+           (when fetch? ;; If the user belonged to one of the affected teams
              (rx/of (dtm/fetch-teams)))))))))
 
 (defn- process-message

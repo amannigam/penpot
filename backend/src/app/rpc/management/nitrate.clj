@@ -316,6 +316,30 @@ RETURNING id, deleted_at;")
                                     :id id}}))))
   nil)
 
+(def ^:private sql:get-team-member-profile-ids
+  "SELECT DISTINCT tpr.profile_id AS profile_id
+     FROM team_profile_rel tpr
+     JOIN profile p ON p.id = tpr.profile_id
+    WHERE tpr.team_id = ANY(?)
+      AND p.deleted_at IS NULL")
+
+(defn- add-deleted-organization-notice!
+  "Appends the organization name to each member's :deleted-organizations prop,
+  keeping the last 5 distinct names.  Uses a single SELECT FOR UPDATE + UPDATE
+  to avoid the redundant read that `update-profile-props` would add."
+  [conn profile-id organization-name]
+  (let [profile  (profile/get-profile conn profile-id ::db/for-update true)
+        existing (-> profile :props :deleted-organizations)
+        updated  (->> (conj (or existing []) organization-name)
+                      distinct
+                      (take-last 5)
+                      vec)
+        props    (assoc (:props profile) :deleted-organizations updated)]
+    (db/update! conn :profile
+                {:props (db/tjson props)}
+                {:id profile-id}
+                {::db/return-keys false})))
+
 (defn manage-deleted-organization-teams
   "For a deleted organization, preserve organization teams unchanged and only prefix or
   delete member Your Penpot teams depending on whether they still contain files."
@@ -355,6 +379,13 @@ RETURNING id, deleted_at;")
 
              ;; Empty imported Your Penpot teams disappear entirely.
              (soft-delete-teams! cfg teams-to-delete)
+
+             ;; Persist notice for offline members
+             (let [profile-ids (->> (db/exec! conn [sql:get-team-member-profile-ids
+                                                    (db/create-array conn "uuid" all-team-ids)])
+                                    (map :profile-id))]
+               (doseq [profile-id profile-ids]
+                 (add-deleted-organization-notice! conn profile-id organization-name)))
 
              (notifications/notify-organization-deletion cfg organization-id organization-name all-team-ids teams-to-delete)
              nil)))))))

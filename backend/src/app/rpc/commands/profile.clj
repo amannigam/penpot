@@ -76,7 +76,8 @@
    [:workspace-visited {:optional true} ::sm/boolean]
    [:custom-shortcuts {:optional true}
     [:map-of {:gen/max 10} :keyword [:map-of :keyword :string]]]
-   [:nudge {:optional true} schema:nudge]])
+   [:nudge {:optional true} schema:nudge]
+   [:deleted-organizations {:optional true} [:maybe [:vector [::sm/text {:max 250}]]]]])
 
 (def schema:profile
   [:map {:title "Profile"}

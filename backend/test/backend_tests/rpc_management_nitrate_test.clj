@@ -421,7 +421,8 @@
 
             ;; --- Fetch teams post-deletion to verify mutations ---
             updated-with-files (th/db-get :team {:id (:id team-with-files)} {::db/remove-deleted false})
-            updated-empty      (th/db-get :team {:id (:id empty-team)} {::db/remove-deleted false})]
+            updated-empty      (th/db-get :team {:id (:id empty-team)} {::db/remove-deleted false})
+            updated-profile    (th/db-get :profile {:id (:id profile)})]
 
         ;; --- Verify: nitrate was queried for the organization summary ---
         (let [[_ method params] (:call-args @nitrate-mock)]
@@ -441,6 +442,9 @@
         (t/is (some? (:deleted-at updated-empty)))
         (t/is (:called? @wrk-mock))
         (t/is (= 1 (:call-count @wrk-mock)))
+
+        ;; --- Verify: profile props contain the deleted organization name ---
+        (t/is (= [organization-name] (-> updated-profile :props db/decode-transit-pgobject :deleted-organizations)))
 
         ;; --- Verify: exactly one organization-deleted event is published on the message bus ---
         (t/is (:called? @mbus-mock))
@@ -523,6 +527,7 @@
             organization-1-updated-empty (th/db-get :team {:id (:id organization-1-team-empty)} {::db/remove-deleted false})
             organization-2-updated-files (th/db-get :team {:id (:id organization-2-team-files)} {::db/remove-deleted false})
             organization-2-updated-empty (th/db-get :team {:id (:id organization-2-team-empty)} {::db/remove-deleted false})
+            updated-profile                (th/db-get :profile {:id (:id profile)})
 
             ;; --- Extract published messages from the message bus mock ---
             msgs              (->> (:call-args-list @mbus-mock)
@@ -540,6 +545,10 @@
         ;; --- Verify: RPC returns success with no result payload ---
         (t/is (th/success? out))
         (t/is (nil? (:result out)))
+
+        ;; --- Verify: profile props contain both deleted organization names in order, without duplicates ---
+        (t/is (= [organization-1-name organization-2-name]
+                 (-> updated-profile :props db/decode-transit-pgobject :deleted-organizations)))
 
         ;; --- Verify: organization-1 team with files kept, renamed, default flag removed ---
         (t/is (false? (:is-default organization-1-updated-files)))

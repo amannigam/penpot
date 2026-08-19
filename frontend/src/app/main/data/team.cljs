@@ -67,7 +67,8 @@
                                                                      :organization-slug
                                                                      :organization-owner-id
                                                                      :organization-avatar-bg-url
-                                                                     :organization-permissions))]
+                                                                     :organization-permissions)
+                                       (not (:organization team)) (dissoc :organization))]
                     (update state :teams assoc id team-updated)))
                 state
                 teams)))))
