@@ -7,10 +7,11 @@
 (ns app.handlers.export-shapes
   (:require
    [app.common.data :as d]
-   [app.common.logging :as l]
+   [app.common.exceptions :as ex]
    [app.common.spec :as us]
    [app.handlers.resources :as rsc]
-   [app.redis :as redis]
+   [app.jobs :as jobs]
+   [app.jobs.utils :as job.utils]
    [app.renderer :as rd]
    [app.util.mime :as mime]
    [app.util.shell :as sh]
@@ -18,9 +19,6 @@
    [cuerdas.core :as str]
    [promesa.core :as p]))
 
-(declare ^:private handle-single-export)
-(declare ^:private handle-multiple-export)
-(declare ^:private assoc-file-name)
 (declare prepare-exports)
 
 ;; Regex to clean namefiles
@@ -50,87 +48,85 @@
   (s/keys :req-un [::exports ::profile-id]
           :opt-un [::wait ::name ::skip-children ::force-multiple ::is-wasm]))
 
-(defn handler
-  [{:keys [:request/auth-token] :as exchange} {:keys [exports force-multiple] :as params}]
-  (let [exports (prepare-exports exports auth-token)]
-    (if (and (not force-multiple)
-             (= 1 (count exports))
-             (= 1 (count (-> exports first :objects))))
-      (handle-single-export exchange (-> params
-                                         (assoc :export (first exports))
-                                         (dissoc :exports)))
-      (handle-multiple-export exchange (assoc params :exports exports)))))
+(defn- count-objects
+  [exports]
+  (reduce + 0 (map (comp count :objects) exports)))
 
-(defn- handle-single-export
-  [{:keys [:request/auth-token] :as exchange} {:keys [export name skip-children is-wasm] :as params}]
-  (let [resource (rsc/create (:type export) (or name (:name export)))
-        export   (assoc export :skip-children skip-children :is-wasm (boolean is-wasm))]
+(defn- check-cancelled!
+  [job]
+  (when (jobs/cancelled? (:id job))
+    (ex/raise :type :internal
+              :code :job-cancelled
+              :hint "export job was cancelled")))
 
-    (->> (rd/render export
-                    (fn [{:keys [path] :as object}]
-                      (sh/move! path (:path resource))))
+(defn- render!
+  "Renders one prepared partition, tagging it with the job so the render
+  backends can observe cancellation."
+  [job export on-object]
+  (check-cancelled! job)
+  (rd/render (assoc export :job-id (:id job)) on-object))
+
+(defn- run-single
+  [job auth-token resource {:keys [export is-wasm skip-children]}]
+  (job.utils/track! (:id job) (:path resource))
+  (->> (render! job
+                (assoc export :skip-children skip-children :is-wasm (boolean is-wasm))
+                (fn [{:keys [path] :as _object}]
+                  (job.utils/track! (:id job) path)
+                  (sh/move! path (:path resource))))
+       (p/fmap (constantly resource))
+       (p/mcat (partial rsc/upload-resource auth-token))
+       (p/fmap (fn [resource] (dissoc resource :path)))))
+
+(defn- run-multiple
+  [job auth-token resource {:keys [exports is-wasm]}]
+  (let [failure (volatile! nil)
+
+        zip     (rsc/create-zip :resource resource
+                                :on-error (fn [cause] (vreset! failure cause))
+                                :on-progress (fn [{:keys [done]}]
+                                               (jobs/progress! job done)))
+
+        append  (fn [{:keys [filename path] :as _object}]
+                  (job.utils/track! (:id job) path)
+                  (rsc/add-to-zip zip path (str/replace filename sanitize-file-regex "_")))]
+
+    (job.utils/track! (:id job) (:path resource))
+    (->> exports
+         (map (fn [export] (render! job (assoc export :is-wasm (boolean is-wasm)) append)))
+         (p/all)
+         (p/mcat (fn [_]
+                   (if-let [cause @failure]
+                     (p/rejected cause)
+                     (rsc/close-zip zip))))
          (p/fmap (constantly resource))
          (p/mcat (partial rsc/upload-resource auth-token))
-         (p/fmap (fn [resource]
-                   (dissoc resource :path)))
-         (p/fmap (fn [resource]
-                   (assoc exchange :response/body resource)))
-         (p/merr (fn [cause]
-                   (l/error :hint "unexpected error on single export"
-                            :cause cause)
-                   (p/rejected cause))))))
+         (p/fmap (fn [resource] (dissoc resource :path))))))
 
-(defn- handle-multiple-export
-  [{:keys [:request/auth-token] :as exchange} {:keys [exports wait profile-id name is-wasm] :as params}]
-  (let [resource    (rsc/create :zip (or name (-> exports first :name)))
-        total       (count exports)
-        topic       (str profile-id)
+(defn prepare
+  "Turns request params into the pieces the job layer needs: the resource the
+  export will produce, how many objects it covers, and the thunk that performs
+  it. Does no work beyond preparing the export descriptors."
+  [auth-token {:keys [exports force-multiple name skip-children is-wasm] :as _params}]
+  (let [exports (prepare-exports exports auth-token)
+        single? (and (not force-multiple)
+                     (= 1 (count exports))
+                     (= 1 (count (-> exports first :objects))))]
+    (if single?
+      (let [export   (first exports)
+            resource (rsc/create (:type export) (or name (:name export)))]
+        {:resource resource
+         :total 1
+         :run (fn [job] (run-single job auth-token resource
+                                    {:export export
+                                     :is-wasm is-wasm
+                                     :skip-children skip-children}))})
 
-        on-progress (fn [{:keys [done]}]
-                      (when-not wait
-                        (let [data {:type :export-update
-                                    :resource-id (:id resource)
-                                    :status "running"
-                                    :total total
-                                    :done done}]
-                          (redis/pub! topic data))))
-
-        on-error    (fn [cause]
-                      (l/error :hint "unexpected error on multiple export" :cause cause)
-                      (if wait
-                        (p/rejected cause)
-                        (redis/pub! topic {:type :export-update
-                                           :resource-id (:id resource)
-                                           :status "error"
-                                           :cause (ex-message cause)})))
-
-        zip         (rsc/create-zip :resource resource
-                                    :on-error on-error
-                                    :on-progress on-progress)
-
-        append      (fn [{:keys [filename path] :as resource}]
-                      (rsc/add-to-zip zip path (str/replace filename sanitize-file-regex "_")))
-
-        proc        (->> exports
-                         (map (fn [export] (rd/render (assoc export :is-wasm (boolean is-wasm)) append)))
-                         (p/all)
-                         (p/mcat (fn [_] (rsc/close-zip zip)))
-                         (p/fmap (constantly resource))
-                         (p/mcat (partial rsc/upload-resource auth-token))
-                         (p/fmap (fn [resource]
-                                   (let [data {:type :export-update
-                                               :name (:name resource)
-                                               :filename (:filename resource)
-                                               :resource-id (:id resource)
-                                               :resource-uri (:uri resource)
-                                               :mtype (:mtype resource)
-                                               :status "ended"}]
-                                     (p/do (redis/pub! topic data)
-                                           (assoc exchange :response/body resource)))))
-                         (p/merr on-error))]
-    (if wait
-      (p/then proc #(assoc exchange :response/body (dissoc % :path)))
-      (assoc exchange :response/body (dissoc resource :path)))))
+      (let [resource (rsc/create :zip (or name (-> exports first :name)))]
+        {:resource resource
+         :total (count-objects exports)
+         :run (fn [job] (run-multiple job auth-token resource
+                                      {:exports exports :is-wasm is-wasm}))}))))
 
 (defn- assoc-file-name
   "A transducer that assocs a candidate filename and avoid duplicates"

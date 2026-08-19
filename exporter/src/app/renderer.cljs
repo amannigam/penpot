@@ -26,6 +26,7 @@
 (s/def ::token ::us/string)
 (s/def ::filename ::us/string)
 (s/def ::is-wasm ::us/boolean)
+(s/def ::job-id ::us/uuid)
 
 (s/def ::object
   (s/keys :req-un [::id ::name ::suffix ::filename]
@@ -36,7 +37,7 @@
 
 (s/def ::render-params
   (s/keys :req-un [::file-id ::page-id ::scale ::token ::type ::objects]
-          :opt-un [::is-wasm]))
+          :opt-un [::is-wasm ::job-id]))
 
 (defn render
   [{:keys [type is-wasm] :as params} on-object]
