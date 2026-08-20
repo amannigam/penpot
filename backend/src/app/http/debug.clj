@@ -17,6 +17,7 @@
    [app.common.pprint :as pp]
    [app.common.time :as ct]
    [app.common.transit :as t]
+   [app.redis :as rds]
    [app.common.uuid :as uuid]
    [app.config :as cf]
    [app.db :as db]
@@ -47,11 +48,56 @@
 ;; INDEX
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(def ^:private max-export-jobs
+  "Enough to cover a saturated exporter -- its queue caps at 64 -- plus the
+  finished ones still inside their TTL."
+  200)
+
+(defn- scan-export-job-keys
+  "Walks the keyspace for export job records. They have no index, since every
+  record expires on its own, so this is the only way to enumerate them."
+  [conn pattern]
+  (loop [cursor "0"
+         found  []]
+    (let [[cursor keys] (rds/scan conn cursor pattern 200)
+          found         (into found keys)]
+      (if (or (nil? cursor)
+              (= "0" cursor)
+              (>= (count found) max-export-jobs))
+        (into [] (take max-export-jobs) found)
+        (recur cursor found)))))
+
+(defn- get-export-jobs
+  "Export jobs as the exporter left them in redis, newest first. Returns an
+  empty list rather than failing the page when redis is unreachable."
+  [cfg job-id]
+  (try
+    (let [pattern (str (cf/get :tenant) ".export.job."
+                       (if (str/empty-or-nil? job-id) "*" (str "*" job-id "*")))]
+      (->> (rds/run! cfg (fn [{:keys [::rds/conn]}]
+                           (->> (scan-export-job-keys conn pattern)
+                                (mapv (fn [key] (rds/hget conn key "data"))))))
+           (keep (fn [blob]
+                   (try
+                     (t/decode-str blob)
+                     (catch Throwable _ nil))))
+           (sort-by :created-at #(compare %2 %1))
+           ;; The exporter stores instants as epoch millis.
+           (map (fn [{:keys [created-at ended-at] :as job}]
+                  (-> job
+                      (assoc :created-at (some-> created-at ct/inst (ct/format-inst :rfc1123)))
+                      (assoc :ended-at (some-> ended-at ct/inst (ct/format-inst :rfc1123))))))
+           (vec)))
+    (catch Throwable cause
+      (l/warn :hint "unable to read export jobs" :cause cause)
+      [])))
+
 (defn index-handler
   [cfg request]
   (let [profile-id (::session/profile-id request)
         offset     (clock/get-offset profile-id)
-        profile    (profile/get-profile cfg profile-id)]
+        profile    (profile/get-profile cfg profile-id)
+        job-filter (some-> request :params :job-id str/trim)]
     {::yres/status  200
      ::yres/headers {"content-type" "text/html"}
      ::yres/body    (-> (io/resource "app/templates/debug.tmpl")
@@ -62,6 +108,8 @@
                                                         (ct/format-duration offset)
                                                         "NO OFFSET")
                                       :current-time  (ct/format-inst (ct/now) :http)
+                                      :export-jobs (get-export-jobs cfg job-filter)
+                                      :export-job-filter job-filter
                                       :supported-features cfeat/supported-features}))}))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
