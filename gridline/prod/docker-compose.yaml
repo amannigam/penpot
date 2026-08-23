@@ -52,7 +52,9 @@ volumes:
 
 services:
   penpot-frontend:
-    image: "${IMAGE_PREFIX}frontend:${PENPOT_VERSION:?set PENPOT_VERSION in .env}"
+    # Pinned separately so the frontend can be rolled back on its own: a
+    # broken bundle takes the whole app down regardless of the backend.
+    image: "${IMAGE_PREFIX}frontend:${PENPOT_FRONTEND_VERSION:-${PENPOT_VERSION:?set PENPOT_VERSION in .env}}"
     restart: always
     logging: *default-logging
     # Bind to the interface named in .env. Default 127.0.0.1 means "reverse

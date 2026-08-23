@@ -218,3 +218,75 @@
   PENPOT_FIGMA_TEAM_ID (comma separated for several) and nobody else is asked."
   []
   (parse-team-ids cf/figma-team-id))
+
+;; --- popup plumbing --------------------------------------------------------
+;;
+;; Figma redirects back to the app origin. Rather than add a route (and boot the
+;; whole SPA) for what is a two-line handoff, the authorization happens in a
+;; popup: the popup posts the code to its opener and closes, and the opener --
+;; which is the only window holding the PKCE verifier -- does the exchange.
+
+(def ^:const message-type "gridline-figma-oauth")
+
+(defn redirect-uri
+  "Must match the URI registered on the Figma OAuth app exactly. Figma rejects
+  any mismatch, so this is derived from the running origin rather than typed."
+  []
+  (str (.-origin (.-location js/window)) "/"))
+
+;; NOTE: the popup side of this runs inlined in app.main, deliberately. It has
+;; to execute before anything else on every page load, and reaching into this
+;; namespace from there is what broke: the var was missing and the whole app
+;; reload-looped. The message shape below must stay in step with it.
+
+(defn open-authorization-popup!
+  "Starts the flow and calls back with {:access-token ...} or {:error ...}.
+
+  Verifier and state stay in this window's closure: the popup never sees them,
+  and nothing is written to storage."
+  [on-result]
+  (let [verifier (random-verifier)
+        state    (random-verifier)
+        redirect (redirect-uri)]
+    (->> (code-challenge verifier)
+         (rx/subs!
+          (fn [challenge]
+            (let [uri    (build-authorize-uri {:redirect-uri redirect
+                                               :state state
+                                               :challenge challenge})
+                  popup  (.open js/window uri "gridline-figma-oauth"
+                                "width=520,height=720,menubar=no,toolbar=no")
+                  listener (atom nil)]
+
+              (if (nil? popup)
+                (on-result {:error :popup-blocked})
+
+                (reset! listener
+                        (fn handler [^js event]
+                          (when (and (= (.-origin event) (.-origin (.-location js/window)))
+                                     (= message-type (some-> event .-data .-type)))
+                            (.removeEventListener js/window "message" handler)
+                            (let [data  (.-data event)
+                                  code  (.-code data)
+                                  ;; Comparing state is what stops another tab's
+                                  ;; callback being accepted as ours.
+                                  ok?   (= state (.-state data))]
+                              (cond
+                                (some? (.-error data))
+                                (on-result {:error (.-error data)
+                                            :detail (.-errorDescription data)})
+                                (not ok?)              (on-result {:error :state-mismatch})
+                                (nil? code)            (on-result {:error :no-code})
+                                :else
+                                (->> (exchange-code {:code code
+                                                     :verifier verifier
+                                                     :redirect-uri redirect})
+                                     (rx/subs! (fn [result] (on-result result))
+                                               (fn [cause]
+                                                 (on-result
+                                                  {:error :exchange-failed
+                                                   :detail (or (some-> cause ex-data :hint)
+                                                               (ex-message cause)
+                                                               (str cause))}))))))))))
+              (when-let [h @listener]
+                (.addEventListener js/window "message" h))))))))

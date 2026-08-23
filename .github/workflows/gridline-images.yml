@@ -117,7 +117,22 @@ jobs:
           # cache above is what actually makes that step cheaper.
           BUILD_WASM: ${{ (inputs.build_wasm == false) && 'no' || 'yes' }}
           BUILD_STORYBOOK: 'no'   # not shipped in the gridline stack
-        run: ./manage.sh build-bundle
+        run: |
+          set -o pipefail
+          ./manage.sh build-bundle 2>&1 | tee /tmp/bundle-build.log
+
+      # ClojureScript reports a call to a function that does not exist as a
+      # warning, not an error, so the build happily ships it. That is how a
+      # deleted function reached production and put the app in a reload loop:
+      # this exact warning was printed, by name, and ignored.
+      - name: Fail on undeclared vars
+        run: |
+          if grep -q ':undeclared-var' /tmp/bundle-build.log; then
+            echo "::error::ClojureScript found calls to vars that do not exist"
+            grep -B2 -A4 ':undeclared-var' /tmp/bundle-build.log | head -80
+            exit 1
+          fi
+          echo "no undeclared vars"
 
       - name: Package bundles
         run: tar -C bundles -czf bundles.tar.gz .

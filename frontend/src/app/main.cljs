@@ -14,7 +14,6 @@
    [app.config :as cf]
    [app.main.data.auth :as da]
    [app.main.data.event :as ev]
-   [app.main.data.gridline.figma :as gfigma]
    [app.main.data.profile :as dp]
    [app.main.data.websocket :as ws]
    [app.main.errors]
@@ -106,6 +105,36 @@
             (rx/take 1)
             (rx/map #(initialize-rasterizer)))))))
 
+(defn- handle-figma-popup-callback!
+  "True when this document is the Figma OAuth popup, in which case the code has
+  been handed to the opener and the window is closing.
+
+  The message shape is mirrored in app.main.data.gridline.figma, which listens
+  for it. One duplicated string is a fair price for this having no namespace
+  dependencies: it runs before anything else on every single page load."
+  []
+  (try
+    (let [params (js/URLSearchParams. (.-search (.-location js/window)))
+          code   (.get params "code")
+          state  (.get params "state")
+          error  (.get params "error")
+          opener (.-opener js/window)]
+      (if (and (some? opener) (or (some? code) (some? error)))
+        (do
+          (.postMessage opener
+                        #js {:type "gridline-figma-oauth"
+                             :code code
+                             :state state
+                             :error error
+                             :errorDescription (.get params "error_description")}
+                        (.-origin (.-location js/window)))
+          (.close js/window)
+          true)
+        false))
+    (catch :default _
+      ;; Never let this stop the app booting.
+      false)))
+
 (defn ^:export init
   [options]
   ;; WORKAROUND: we set this really not useful property for signal a
@@ -122,7 +151,13 @@
     ;; job is to hand the authorization code to the window that opened it and
     ;; close. Booting the app here would be waste, and the opener holds the
     ;; PKCE verifier anyway.
-    (gfigma/handle-popup-callback!)
+    ;;
+    ;; Deliberately inline and dependency-free. Calling into
+    ;; app.main.data.gridline.figma from here left the var undefined at init
+    ;; time, and because this runs on EVERY page load the resulting error put
+    ;; the whole app in a reload loop -- not just the Figma flow. Nothing here
+    ;; touches anything but js/window.
+    (handle-figma-popup-callback!)
     nil
 
     ;; Before initializing anything, check if the browser has loaded
