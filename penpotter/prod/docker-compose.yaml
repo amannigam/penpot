@@ -77,6 +77,10 @@ services:
       PENPOT_SMTP_PASSWORD: ${PENPOT_SMTP_PASSWORD}
       PENPOT_SMTP_TLS: "${PENPOT_SMTP_TLS:-true}"
       PENPOT_SMTP_SSL: "${PENPOT_SMTP_SSL:-false}"
+      # run.sh appends JVM_OPTS to JAVA_OPTS. Unbounded, the JVM sizes its heap
+      # from host RAM and will happily starve Postgres on a small box.
+      JVM_OPTS: ${BACKEND_JVM_OPTS:--Xmx1g}
+    mem_limit: ${BACKEND_MEM_LIMIT:-1600m}
 
   penpot-exporter:
     image: "${IMAGE_PREFIX}exporter:${PENPOT_VERSION}"
@@ -89,6 +93,7 @@ services:
       <<: [*penpot-secret-key, *penpot-public-uri]
       PENPOT_INTERNAL_URI: http://penpot-frontend:8080
       PENPOT_REDIS_URI: redis://penpot-valkey/0
+    mem_limit: ${EXPORTER_MEM_LIMIT:-1g}
 
   penpot-mcp:
     image: "${IMAGE_PREFIX}mcp:${PENPOT_VERSION}"
@@ -115,19 +120,20 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-penpot}
       POSTGRES_USER: ${POSTGRES_USER:-penpot}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-    # Tuning for a 16GB host. Adjust to ~25% of RAM for shared_buffers.
+    # Defaults sized for a ~6GB host. shared_buffers ~25% of the RAM you
+    # are willing to give Postgres; raise everything if the box grows.
     command:
       - postgres
       - -c
-      - shared_buffers=${PG_SHARED_BUFFERS:-1GB}
+      - shared_buffers=${PG_SHARED_BUFFERS:-384MB}
       - -c
-      - effective_cache_size=${PG_EFFECTIVE_CACHE_SIZE:-3GB}
+      - effective_cache_size=${PG_EFFECTIVE_CACHE_SIZE:-1GB}
       - -c
-      - work_mem=${PG_WORK_MEM:-16MB}
+      - work_mem=${PG_WORK_MEM:-8MB}
       - -c
-      - maintenance_work_mem=${PG_MAINTENANCE_WORK_MEM:-256MB}
+      - maintenance_work_mem=${PG_MAINTENANCE_WORK_MEM:-96MB}
       - -c
-      - max_connections=${PG_MAX_CONNECTIONS:-100}
+      - max_connections=${PG_MAX_CONNECTIONS:-50}
 
   penpot-valkey:
     image: valkey/valkey:8.1

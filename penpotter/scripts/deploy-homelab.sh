@@ -14,7 +14,7 @@ cd "$(dirname "$0")/../.."
 [[ -f penpotter/scripts/homelab.env ]] && source penpotter/scripts/homelab.env
 
 HOST="${1:-${PENPOTTER_HOST:-homelab}}"
-DIR="${2:-${PENPOTTER_DIR:-/opt/penpotter}}"
+DIR="${2:-${PENPOTTER_DIR:-/home/claw/penpotter}}"
 PROJECT="${PENPOTTER_PROJECT:-penpotter}"
 
 info() { printf '\033[1;34m==>\033[0m %s\n' "$*"; }
@@ -41,7 +41,7 @@ if ! ssh "$HOST" "test -f '$DIR/.env'"; then
   Stopping here. Fill in the secrets on the server, then re-run this script:
 
     ssh $HOST
-    sudo -e $DIR/.env      # PENPOT_SECRET_KEY, POSTGRES_PASSWORD, SMTP, PENPOT_PUBLIC_URI
+    ${EDITOR:-nano} $DIR/.env      # PENPOT_SECRET_KEY, POSTGRES_PASSWORD, SMTP, PENPOT_PUBLIC_URI
 
   Generate the keys with:
     python3 -c "import secrets; print(secrets.token_urlsafe(64))"   # PENPOT_SECRET_KEY

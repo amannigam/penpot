@@ -100,7 +100,7 @@ Then deploy:
 penpotter/scripts/deploy-homelab.sh            # uses the `homelab` ssh host
 ```
 
-First run seeds `/opt/penpotter/.env` from the example and stops so you can fill
+First run seeds `/home/claw/penpotter/.env` from the example and stops so you can fill
 in secrets on the server. Subsequent runs rsync the stack, `docker compose pull`,
 and `up -d`. The server's `.env` is never overwritten.
 
@@ -109,7 +109,7 @@ Cut a release:
 ```bash
 git tag -a v0.1.0 -m "penpotter 0.1.0" && git push origin v0.1.0
 # wait for CI, then:
-ssh homelab "sed -i 's/^PENPOT_VERSION=.*/PENPOT_VERSION=v0.1.0/' /opt/penpotter/.env"
+ssh homelab "sed -i 's/^PENPOT_VERSION=.*/PENPOT_VERSION=v0.1.0/' /home/claw/penpotter/.env"
 penpotter/scripts/deploy-homelab.sh
 ```
 
