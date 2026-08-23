@@ -49,9 +49,44 @@ create temporary table _dead_teams on commit drop as
   select t.id from team t
   where not exists (select 1 from team_profile_rel r where r.team_id = t.id);
 
-delete from file    where project_id in (select p.id from project p join _dead_teams d on d.id = p.team_id);
-delete from project where team_id    in (select id from _dead_teams);
-delete from team    where id         in (select id from _dead_teams);
+create temporary table _dead_files on commit drop as
+  select f.id from file f
+  join project p on p.id = f.project_id
+  join _dead_teams d on d.id = p.team_id;
+
+-- Several tables reference file with ON DELETE NO ACTION (file_thumbnail,
+-- file_data_15, file_media_object, the object-thumbnail tables...), so the
+-- file rows cannot go first. Rather than hardcode that list -- it grew once
+-- already and broke this script -- ask the catalogue which children block us
+-- and clear them.
+do \$\$
+declare r record;
+begin
+  for r in
+    select distinct tc.table_name as child, kcu.column_name as col
+    from information_schema.table_constraints tc
+    join information_schema.referential_constraints rc
+      on rc.constraint_name = tc.constraint_name
+    join information_schema.constraint_column_usage ccu
+      on ccu.constraint_name = tc.constraint_name
+    join information_schema.key_column_usage kcu
+      on kcu.constraint_name = tc.constraint_name
+    where tc.constraint_type = 'FOREIGN KEY'
+      and ccu.table_name = 'file'
+      and rc.delete_rule = 'NO ACTION'
+      and tc.table_name <> 'file'
+  loop
+    execute format('delete from %I where %I in (select id from _dead_files)',
+                   r.child, r.col);
+  end loop;
+end
+\$\$;
+
+delete from file              where id      in (select id from _dead_files);
+-- team_font_variant is NO ACTION on team, so it has to precede the team too.
+delete from team_font_variant where team_id in (select id from _dead_teams);
+delete from project           where team_id in (select id from _dead_teams);
+delete from team              where id      in (select id from _dead_teams);
 
 commit;
 SQL
