@@ -126,6 +126,44 @@ Today those are three disconnected things:
 So the flow must be honest: show what converted, what didn't, and let people
 re-import a file after fixing it, without duplicating projects.
 
+**Decided 2026-08-23: discovery is ours, conversion stays the plugin's.**
+
+Figma's REST API can list files, so the picker is worth building:
+`GET /v1/teams/:team_id/projects` then `GET /v1/projects/:project_id/files`.
+Two constraints are surfaced in the UI rather than hidden — Figma's docs state
+outright that "it is not possible to programmatically obtain team IDs" (so the
+team URL is pasted), and drafts live outside team projects so they are not
+listed.
+
+Conversion is a different matter. The exporter's transformers are typed
+against Figma's *plugin* API — `MinimalFillsMixin`, `VectorNode`,
+`TextSegment` — and images come from `image.getBytesAsync()`, which REST has
+no equivalent for (it returns an `imageRef` resolved through a separate
+endpoint). Text styling, vector geometry and style ids are all modelled
+differently too. Reusable from that repo: `ui-src/lib`, the `.penpot` builder,
+which is input-agnostic and MPL-2.0 like Penpot. Not reusable:
+`plugin-src/transformers`, ~20 transformers and ~30 translators.
+
+So a REST converter is weeks of work that starts behind the plugin on fidelity
+and then chases it forever. Rejected for now. Figma's MCP server is not an
+alternative either: it is built for code generation from a selection, not a
+fidelity-preserving representation.
+
+Also worth knowing: a Figma plugin can only see the file it is open in, so
+there is no bulk mode to add to the plugin either. The per-file run is Figma's
+constraint, not the plugin's.
+
+**Built.** `app.main.data.penpotter.figma` (browser-side REST client; Figma
+serves `access-control-allow-origin: *` and allows `X-Figma-Token`, so the
+token never reaches our backend and is never stored) and
+`app.main.ui.onboarding.figma-import` (intro → connect → checklist, with
+deep links, zip-to-row matching by squashed name, and progress).
+
+**Still open.** Auto-matching depends on the exporter naming its zip after the
+file; unmatched zips import fine but leave the row unticked. The worklist is
+component state, so it does not survive a reload yet — persist it in profile
+props next.
+
 **Where this touches the code.** `frontend/src/app/main/ui/onboarding/`, the
 dashboard import path, and `backend` file-import RPC. Keep our changes additive
 and behind a flag (`enable-penpotter-onboarding`) so upstream merges stay clean.
