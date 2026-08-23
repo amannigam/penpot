@@ -109,3 +109,5 @@ opencode.json
 penpotter/dev/.env
 penpotter/prod/.env
 penpotter/scripts/homelab.env
+penpotter/desktop/node_modules/
+penpotter/desktop/dist/

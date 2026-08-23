@@ -17,6 +17,13 @@ on:
   push:
     branches: [penpotter]
     tags: ['v*']
+    # The images are built from the Penpot source trees. Our deployment
+    # overlay and the desktop shell never end up inside them, so changing
+    # those should not burn a 20-minute rebuild.
+    paths-ignore:
+      - 'penpotter/**'
+      - 'docs/**'
+      - '**/*.md'
   workflow_dispatch:
     inputs:
       platforms:

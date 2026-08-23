@@ -72,6 +72,8 @@ services:
       PENPOT_DATABASE_URI: postgresql://penpot-postgres/penpot
       PENPOT_DATABASE_USERNAME: penpot
       PENPOT_DATABASE_PASSWORD: penpot
+      # Upstream default is 60 eagerly-opened connections; 20 is plenty locally.
+      PENPOT_DATABASE_MAX_POOL_SIZE: 20
       PENPOT_REDIS_URI: redis://penpot-valkey/0
       PENPOT_OBJECTS_STORAGE_BACKEND: fs
       PENPOT_OBJECTS_STORAGE_FS_DIRECTORY: /opt/data/assets
