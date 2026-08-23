@@ -218,7 +218,11 @@
                       #js {:type message-type
                            :code code
                            :state state
-                           :error error}
+                           :error error
+                           ;; Figma explains itself here ("Invalid scopes for
+                           ;; app", redirect mismatches...). Losing it leaves
+                           ;; nothing to debug from.
+                           :errorDescription (.get params "error_description")}
                       (.-origin (.-location js/window)))
         (.close js/window)
         true)
@@ -257,7 +261,9 @@
                                   ;; callback being accepted as ours.
                                   ok?   (= state (.-state data))]
                               (cond
-                                (some? (.-error data)) (on-result {:error (.-error data)})
+                                (some? (.-error data))
+                                (on-result {:error (.-error data)
+                                            :detail (.-errorDescription data)})
                                 (not ok?)              (on-result {:error :state-mismatch})
                                 (nil? code)            (on-result {:error :no-code})
                                 :else
@@ -265,6 +271,11 @@
                                                      :verifier verifier
                                                      :redirect-uri redirect})
                                      (rx/subs! (fn [result] (on-result result))
-                                               (fn [cause] (on-result {:error cause}))))))))))
+                                               (fn [cause]
+                                                 (on-result
+                                                  {:error :exchange-failed
+                                                   :detail (or (some-> cause ex-data :hint)
+                                                               (ex-message cause)
+                                                               (str cause))}))))))))))
               (when-let [h @listener]
                 (.addEventListener js/window "message" h))))))))

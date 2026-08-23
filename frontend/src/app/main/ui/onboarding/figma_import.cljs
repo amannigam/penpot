@@ -151,7 +151,7 @@
                (reset! error* nil)
                (reset! loading* true)
                (figma/open-authorization-popup!
-                (fn [{:keys [access-token error]}]
+                (fn [{:keys [access-token error detail]}]
                   (if (some? access-token)
                     (do (reset! token* access-token)
                         (list-files! access-token))
@@ -160,7 +160,11 @@
                                 (case error
                                   :popup-blocked  (tr "onboarding.figma-import.error-popup")
                                   :state-mismatch (tr "onboarding.figma-import.error-state")
-                                  (tr "onboarding.figma-import.error-connect")))))))))))
+                                  ;; Show what Figma actually said. A generic
+                                  ;; "try again" hides the one useful fact.
+                                  (str (tr "onboarding.figma-import.error-connect")
+                                       (when (or detail error)
+                                         (str " (" (or detail error) ")")))))))))))))
 
         on-toggle
         (mf/use-fn
