@@ -4775,6 +4775,78 @@ msgid "onboarding.choice.team-up.start-without-a-team-description"
 msgstr "You will be able to create a team later."
 
 #: src/app/main/ui/onboarding/figma_import.cljs
+msgid "onboarding.figma-import.connect"
+msgstr "Connect Figma"
+
+#: src/app/main/ui/onboarding/figma_import.cljs
+msgid "onboarding.figma-import.connect-desc"
+msgstr "Two things from Figma, used only in your browser and never stored on this server."
+
+#: src/app/main/ui/onboarding/figma_import.cljs
+msgid "onboarding.figma-import.done"
+msgstr "I'm done for now"
+
+#: src/app/main/ui/onboarding/figma_import.cljs
+msgid "onboarding.figma-import.drafts-note"
+msgstr "Only files inside team projects are listed. Figma keeps drafts outside projects, so those won't appear here — export those with the plugin directly."
+
+#: src/app/main/ui/onboarding/figma_import.cljs
+msgid "onboarding.figma-import.empty-project"
+msgstr "No files in this project."
+
+#: src/app/main/ui/onboarding/figma_import.cljs
+msgid "onboarding.figma-import.error-bad-team"
+msgstr "That doesn't look like a team id or a Figma team URL."
+
+#: src/app/main/ui/onboarding/figma_import.cljs
+msgid "onboarding.figma-import.error-no-token"
+msgstr "Paste a Figma personal access token first."
+
+#: src/app/main/ui/onboarding/figma_import.cljs
+msgid "onboarding.figma-import.file-imported"
+msgstr "Imported"
+
+#: src/app/main/ui/onboarding/figma_import.cljs
+msgid "onboarding.figma-import.list-my-files"
+msgstr "List my Figma files"
+
+#: src/app/main/ui/onboarding/figma_import.cljs
+msgid "onboarding.figma-import.listing"
+msgstr "Asking Figma…"
+
+#: src/app/main/ui/onboarding/figma_import.cljs
+msgid "onboarding.figma-import.open-in-figma"
+msgstr "Open in Figma"
+
+#: src/app/main/ui/onboarding/figma_import.cljs
+msgid "onboarding.figma-import.progress"
+msgstr "imported"
+
+#: src/app/main/ui/onboarding/figma_import.cljs
+msgid "onboarding.figma-import.select-all"
+msgstr "Select all"
+
+#: src/app/main/ui/onboarding/figma_import.cljs
+msgid "onboarding.figma-import.team-help"
+msgstr "Figma can't tell us your teams, so paste the team URL from your Figma browser tab."
+
+#: src/app/main/ui/onboarding/figma_import.cljs
+msgid "onboarding.figma-import.team-label"
+msgstr "Team URL or id"
+
+#: src/app/main/ui/onboarding/figma_import.cljs
+msgid "onboarding.figma-import.token-help"
+msgstr "Create one in Figma under Settings → Security → Personal access tokens."
+
+#: src/app/main/ui/onboarding/figma_import.cljs
+msgid "onboarding.figma-import.token-help-link"
+msgstr "How to create a token"
+
+#: src/app/main/ui/onboarding/figma_import.cljs
+msgid "onboarding.figma-import.token-label"
+msgstr "Personal access token"
+
+#: src/app/main/ui/onboarding/figma_import.cljs
 msgid "onboarding.figma-import.caveat"
 msgstr ""
 "Big files can take a while, and prototyping interactions don't come across. "
