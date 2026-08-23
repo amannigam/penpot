@@ -9,7 +9,7 @@
   files somebody might want to migrate.
 
   This runs in the browser and calls api.figma.com directly. Figma serves
-  `access-control-allow-origin: *` and allows the X-Figma-Token header, so no
+  `access-control-allow-origin: *` and permits the Authorization header, so no
   proxy is needed -- which is the point: the access token never reaches our
   backend, and we never store it.
 
@@ -52,7 +52,11 @@
   [token path]
   (->> (http/send! {:method :get
                     :uri (str base-uri path)
-                    :headers {"X-Figma-Token" token}
+                    ;; OAuth access tokens go in an Authorization header.
+                    ;; X-Figma-Token is only for personal access tokens -- it
+                    ;; was a leftover from that flow, and Figma answers
+                    ;; "Invalid token" when an OAuth token arrives that way.
+                    :headers {"Authorization" (str "Bearer " token)}
                     ;; Penpot's default headers exist for our own API; none of
                     ;; them belong in a third-party request.
                     :omit-default-headers true
