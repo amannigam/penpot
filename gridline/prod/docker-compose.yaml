@@ -33,15 +33,21 @@ networks:
 # project name, so the Gridline rename would otherwise have pointed the stack
 # at brand-new empty volumes and orphaned the live database. The data has been
 # in these since the instance was first stood up; the names are deliberately
-# frozen and should outlive any further renaming.
+# frozen and should outlive any further renaming. `external: true` says the
+# volumes are not this project's to create or destroy, which is what compose
+# asks for when a volume predates the project that mounts it.
 volumes:
   gridline_postgres:
+    external: true
     name: penpotter_penpotter_postgres
   gridline_assets:
+    external: true
     name: penpotter_penpotter_assets
+  # Not pinned: the caddy profile has never been enabled, so there is no
+  # existing volume to preserve and declaring it external would fail `up`.
   gridline_caddy:
-    name: penpotter_penpotter_caddy
   gridline_mailpit:
+    external: true
     name: penpotter_penpotter_mailpit
 
 services:
