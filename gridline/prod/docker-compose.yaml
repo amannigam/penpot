@@ -65,6 +65,11 @@ services:
     networks: [gridline]
     environment:
       <<: [*penpot-flags, *penpot-http-body-size, *penpot-public-uri]
+      # The nginx entrypoint rewrites config.js from this at container start so
+      # the browser can build the Figma authorize URL. Public identifier only --
+      # the client secret stays with the backend, which is the whole reason the
+      # token exchange happens server-side.
+      PENPOT_FIGMA_CLIENT_ID: ${PENPOT_FIGMA_CLIENT_ID}
 
   penpot-backend:
     image: "${IMAGE_PREFIX}backend:${PENPOT_VERSION}"
