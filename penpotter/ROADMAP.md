@@ -56,8 +56,15 @@ true. GitHub did not, because of a dropped field: `/user/emails` reports
 `verified` per address and `lookup-github-email` kept only the address. Fixed in
 this fork by preserving the flag (`oidc.clj`), which also generalised the
 `::get-email-fn` hook to return `{:email, :verified}` so any future provider can
-report the same thing. The public profile email from `/user` is deliberately
-still treated as unverified — GitHub makes no ownership guarantee about it.
+report the same thing.
+
+The subtlety that cost us a deploy: `/user` exposes a *public profile email*
+when the account sets one, and upstream short-circuits on it without ever
+calling `/user/emails`. The flag lives only on that second endpoint, so the
+short-circuit meant "verified" was unknowable for exactly the accounts that
+have a public email. We now always fetch the list and look the chosen address
+up in it — an address GitHub lists as verified is verified regardless of which
+endpoint surfaced it. Addresses absent from the list stay unverified.
 
 Apple, when it lands, gets the same treatment: it authenticates the user, so no
 verification mail.

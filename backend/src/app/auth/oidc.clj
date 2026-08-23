@@ -233,51 +233,44 @@
 (defn- lookup-github-email
   "Returns {:email ... :verified bool} for the GitHub account.
 
-  GitHub's /user/emails reports, per address, whether GitHub has verified
-  ownership of it. Upstream read only the address and discarded that flag,
-  which sent every GitHub signup through Penpot's own email verification even
-  though GitHub had already proven the address. We keep the flag.
+  GitHub reports verification per address on /user/emails, and that list is
+  the only place the flag exists. The public profile email exposed on /user
+  carries no flag of its own, but an address GitHub lists as verified is
+  verified no matter which endpoint surfaced it -- so we always fetch the list
+  and look the chosen address up in it.
 
-  The public profile email exposed by /user carries no such guarantee, so when
-  it is used as a fallback the address stays unverified."
+  Address selection matches upstream: the public profile email when set,
+  otherwise the primary one. An address absent from the list is reported
+  unverified, which sends the signup down Penpot's own verification path."
   [cfg tdata props]
-  (if-let [email (some-> props :github/email)]
-    {:email email :verified false}
-    (let [params {:uri "https://api.github.com/user/emails"
-                  :headers {"Authorization" (dm/str (:token/type tdata) " " (:token/access tdata))}
-                  :timeout 6000
-                  :method :get}
+  (let [params {:uri "https://api.github.com/user/emails"
+                :headers {"Authorization" (dm/str (:token/type tdata) " " (:token/access tdata))}
+                :timeout 6000
+                :method :get}
 
-          {:keys [status body]} (http/req cfg params)]
+        {:keys [status body]} (http/req cfg params)]
 
-      (when-not (int-in-range? status 200 300)
-        (ex/raise :type :internal
-                  :code :unable-to-retrieve-github-emails
-                  :hint "unable to retrieve github emails"
-                  :request-uri (:uri params)
-                  :response-status status
-                  :response-body body))
+    (when-not (int-in-range? status 200 300)
+      (ex/raise :type :internal
+                :code :unable-to-retrieve-github-emails
+                :hint "unable to retrieve github emails"
+                :request-uri (:uri params)
+                :response-status status
+                :response-body body))
 
-      (let [primary (->> body json/decode (filter :primary) first)]
-        {:email (:email primary)
-         :verified (true? (:verified primary))}))))
+    (let [entries (json/decode body)
+          public  (some-> props :github/email)
+          primary (->> entries (filter :primary) first)
+          email   (or public (:email primary))
+          entry   (d/seek #(= email (:email %)) entries)]
 
-(defn- get-github-config
-  [cfg]
-  (d/without-nils
-   {:client-id        (cf/get :github-client-id)
-    :client-secret    (cf/get :github-client-secret)
-    :scopes           #{"read:user" "user:email"}
-    :auth-uri         "https://github.com/login/oauth/authorize"
-    :token-uri        "https://github.com/login/oauth/access_token"
-    :user-uri         "https://api.github.com/user"
-    :type             "github"
-    :id               "github"
-    :user-info-source "userinfo"
+      (l/dbg :hint "github email resolved"
+             :email email
+             :from (if public "profile" "primary")
+             :verified (true? (:verified entry)))
 
-    ;; Additional hooks for provider specific way of
-    ;; retrieve emails.
-    ::get-email-fn  (partial lookup-github-email cfg)}))
+      {:email email
+       :verified (true? (:verified entry))})))
 
 (defn- prepare-github-provider
   [params]
