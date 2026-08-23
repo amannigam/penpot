@@ -169,3 +169,86 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=${{ matrix.image }}
           cache-to: type=gha,mode=max,scope=${{ matrix.image }}
+
+  # The backend is not AOT-compiled: `require` runs when the container boots,
+  # so a missing symbol builds a perfectly good image that crash-loops on
+  # deploy. Booting the real image against throwaway infra is the only thing
+  # that catches it. Enabling the GitHub provider with dummy credentials is
+  # deliberate -- it forces the OIDC namespace to load.
+  smoke:
+    name: Smoke test backend image
+    needs: images
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: read
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: penpot
+          POSTGRES_USER: penpot
+          POSTGRES_PASSWORD: penpot
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U penpot"
+          --health-interval 2s --health-timeout 5s --health-retries 20
+      valkey:
+        image: valkey/valkey:8.1
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "valkey-cli ping"
+          --health-interval 2s --health-timeout 5s --health-retries 20
+
+    steps:
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Boot the backend
+        run: |
+          TAG="sha-$(echo '${{ github.sha }}' | cut -c1-7)"
+          echo "Booting ${IMAGE_PREFIX}backend:${TAG}"
+          docker run -d --name penpot-smoke --network host \
+            -e PENPOT_HTTP_SERVER_PORT=6060 \
+            -e PENPOT_DATABASE_URI=postgresql://localhost:5432/penpot \
+            -e PENPOT_DATABASE_USERNAME=penpot \
+            -e PENPOT_DATABASE_PASSWORD=penpot \
+            -e PENPOT_REDIS_URI=redis://localhost:6379/0 \
+            -e PENPOT_SECRET_KEY=smoke-test-only-not-a-real-key \
+            -e PENPOT_FLAGS="enable-login-with-github disable-telemetry disable-secure-session-cookies" \
+            -e PENPOT_GITHUB_CLIENT_ID=smoke-test \
+            -e PENPOT_GITHUB_CLIENT_SECRET=smoke-test \
+            "${IMAGE_PREFIX}backend:${TAG}"
+
+      - name: Wait for readiness
+        run: |
+          for i in $(seq 1 60); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 http://localhost:6060/readyz || echo 000)
+            if [ "$code" = "200" ]; then echo "ready after $((i*5))s"; exit 0; fi
+            # Fail fast if the container gave up rather than waiting out the loop.
+            if [ "$(docker inspect -f '{{.State.Running}}' penpot-smoke)" != "true" ]; then
+              echo "::error::backend exited during startup"
+              docker logs penpot-smoke 2>&1 | tail -60
+              exit 1
+            fi
+            sleep 5
+          done
+          echo "::error::backend never became ready"
+          docker logs penpot-smoke 2>&1 | tail -60
+          exit 1
+
+      - name: Confirm the GitHub provider initialised
+        run: |
+          if docker logs penpot-smoke 2>&1 | grep -q 'provider initialized.*github'; then
+            echo "github provider loaded"
+          else
+            echo "::error::github provider did not initialise"
+            docker logs penpot-smoke 2>&1 | grep -iE 'oidc|github|error' | tail -30
+            exit 1
+          fi

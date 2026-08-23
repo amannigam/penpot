@@ -272,6 +272,23 @@
       {:email email
        :verified (true? (:verified entry))})))
 
+(defn- get-github-config
+  [cfg]
+  (d/without-nils
+   {:client-id        (cf/get :github-client-id)
+    :client-secret    (cf/get :github-client-secret)
+    :scopes           #{"read:user" "user:email"}
+    :auth-uri         "https://github.com/login/oauth/authorize"
+    :token-uri        "https://github.com/login/oauth/access_token"
+    :user-uri         "https://api.github.com/user"
+    :type             "github"
+    :id               "github"
+    :user-info-source "userinfo"
+
+    ;; Additional hooks for provider specific way of
+    ;; retrieve emails.
+    ::get-email-fn  (partial lookup-github-email cfg)}))
+
 (defn- prepare-github-provider
   [params]
   (when-not (and (string? (:client-id params))
