@@ -134,6 +134,22 @@ jobs:
           fi
           echo "no undeclared vars"
 
+      # The converter is pure -- no database, no network -- so it can be tested
+      # in the devenv image the bundle build has already pulled. A conversion
+      # that silently produces an empty or malformed file is the failure mode
+      # worth guarding against.
+      - name: Test the Figma converter
+        run: |
+          docker run --rm -v "$PWD":/home/penpot/penpot \
+            -w /home/penpot/penpot/backend --entrypoint bash \
+            penpotapp/devenv:latest -lc \
+            'clojure -M:dev -e "
+               (require (quote backend-tests.gridline.figma-convert-test))
+               (let [r (clojure.test/run-tests
+                         (quote backend-tests.gridline.figma-convert-test))]
+                 (println :result r)
+                 (System/exit (if (pos? (+ (:fail r) (:error r))) 1 0)))"'
+
       - name: Package bundles
         run: tar -C bundles -czf bundles.tar.gz .
 

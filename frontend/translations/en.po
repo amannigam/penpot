@@ -4819,6 +4819,14 @@ msgid "onboarding.figma-import.file-imported"
 msgstr "Imported"
 
 #: src/app/main/ui/onboarding/figma_import.cljs
+msgid "onboarding.figma-import.file-importing"
+msgstr "Importing…"
+
+#: src/app/main/ui/onboarding/figma_import.cljs
+msgid "onboarding.figma-import.import-file"
+msgstr "Import"
+
+#: src/app/main/ui/onboarding/figma_import.cljs
 msgid "onboarding.figma-import.list-my-files"
 msgstr "List my Figma files"
 

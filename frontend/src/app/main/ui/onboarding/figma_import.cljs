@@ -59,7 +59,7 @@
 
 (mf/defc file-row*
   {::mf/private true}
-  [{:keys [file selected done on-toggle]}]
+  [{:keys [file selected done busy error on-toggle on-import]}]
   (let [file-key (get file :key)
         name     (get file :name)]
     [:li {:class (stl/css-case :file-row true :file-row-done done)}
@@ -70,14 +70,32 @@
       [:> text* {:as "span" :typography t/body-medium :class (stl/css :color-light)}
        name]]
 
-     (if done
+     (cond
+       done
        [:> text* {:as "span" :typography t/body-small :class (stl/css :file-status-done)}
         (tr "onboarding.figma-import.file-imported")]
-       [:a {:class (stl/css :link)
-            :href (figma/file-uri file-key)
-            :target "_blank"
-            :rel "noopener noreferrer"}
-        (tr "onboarding.figma-import.open-in-figma")])]))
+
+       busy
+       [:> text* {:as "span" :typography t/body-small :class (stl/css :color-dimmed)}
+        (tr "onboarding.figma-import.file-importing")]
+
+       :else
+       [:div {:class (stl/css :file-actions)}
+        [:> button* {:variant "secondary"
+                     :on-click #(on-import file-key name)}
+         (tr "onboarding.figma-import.import-file")]
+        ;; Kept as a fallback: anything the converter cannot represent is
+        ;; still exportable by hand with the plugin.
+        [:a {:class (stl/css :link)
+             :href (figma/file-uri file-key)
+             :target "_blank"
+             :rel "noopener noreferrer"}
+         (tr "onboarding.figma-import.open-in-figma")]])
+
+     (when error
+       [:> text* {:as "div" :typography t/body-small :class (stl/css :error)}
+        error])]))
+
 
 ;; ---------------------------------------------------------------------------
 
@@ -105,6 +123,8 @@
         groups*    (mf/use-state nil)
         selected*  (mf/use-state #{})
         done*      (mf/use-state #{})
+        busy*      (mf/use-state #{})     ;; keys currently importing
+        failed*    (mf/use-state {})      ;; key -> message
 
         file-input (mf/use-ref nil)
 
@@ -165,6 +185,32 @@
                                   (str (tr "onboarding.figma-import.error-connect")
                                        (when (or detail error)
                                          (str " (" (or detail error) ")")))))))))))))
+
+        ;; Read the file over Figma's API and write it as a Gridline file.
+        ;; No plugin, no zip, no per-file clicking.
+        on-import-file
+        (mf/use-fn
+         (mf/deps project-id @token*)
+         (fn [file-key file-name]
+           (when (and project-id @token*)
+             (swap! busy* conj file-key)
+             (swap! failed* dissoc file-key)
+             (->> (figma/import-file {:token @token*
+                                      :file-key file-key
+                                      :project-id project-id
+                                      :name file-name})
+                  (rx/subs!
+                   (fn [_result]
+                     (swap! busy* disj file-key)
+                     (swap! done* conj file-key)
+                     (st/emit! (ev/event {::ev/name "onboarding-step"
+                                          :label "figma-import:file-imported"})))
+                   (fn [cause]
+                     (swap! busy* disj file-key)
+                     (swap! failed* assoc file-key
+                            (or (some-> cause ex-data :hint)
+                                (ex-message cause)
+                                "import failed"))))))))
 
         on-toggle
         (mf/use-fn
@@ -301,7 +347,10 @@
                                  :file file
                                  :selected (contains? @selected* (:key file))
                                  :done (contains? @done* (:key file))
-                                 :on-toggle on-toggle}])]
+                                 :busy (contains? @busy* (:key file))
+                                 :error (get @failed* (:key file))
+                                 :on-toggle on-toggle
+                                 :on-import on-import-file}])]
                [:> text* {:as "div" :typography t/body-small :class (stl/css :color-dimmed)}
                 (tr "onboarding.figma-import.empty-project")])])]
 

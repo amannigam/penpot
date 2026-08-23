@@ -170,3 +170,10 @@
 .hidden-form {
   display: none;
 }
+
+.file-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-s);
+  white-space: nowrap;
+}

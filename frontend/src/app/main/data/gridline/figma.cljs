@@ -161,7 +161,8 @@
 ;; successor to projects:read, but the v1 endpoints still demand projects:read
 ;; -- a scope Figma no longer offers when configuring an app. The v2 endpoints
 ;; are the ones that actually accept folders:read, so those are what we call.
-(def ^:const scopes "folders:read")
+;; file_content:read is what GET /v1/files/:key needs, for the importer.
+(def ^:const scopes "folders:read file_content:read")
 
 (defn- base64url
   [^js buffer]
@@ -206,6 +207,18 @@
   (rp/cmd! :exchange-figma-code {:code code
                                  :code-verifier verifier
                                  :redirect-uri redirect-uri}))
+
+(defn import-file
+  "Hand a Figma file to the backend to read and convert.
+
+  The token goes to our server for this one call: the document JSON is large,
+  it has to be converted and persisted server-side anyway, and images will
+  need fetching from there too. Listing still happens in the browser."
+  [{:keys [token file-key project-id name]}]
+  (rp/cmd! :import-figma-file (cond-> {:token token
+                                       :file-key file-key
+                                       :project-id project-id}
+                                (some? name) (assoc :name name))))
 
 (defn configured?
   []

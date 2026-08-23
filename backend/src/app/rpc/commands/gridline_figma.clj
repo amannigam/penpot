@@ -18,13 +18,20 @@
   We hold no Figma credentials for anyone; if the tab is closed the connection
   is simply made again."
   (:require
+   [app.binfile.common :as bfc]
    [app.common.data :as d]
    [app.common.exceptions :as ex]
    [app.common.logging :as l]
    [app.common.schema :as sm]
    [app.common.uri :as u]
+   [app.common.time :as ct]
    [app.config :as cf]
+   [app.gridline.figma.client :as figma]
+   [app.gridline.figma.convert :as figma.convert]
    [app.http.client :as http]
+   [app.rpc :as-alias rpc]
+   [app.rpc.commands.projects :as projects]
+   [app.db :as db]
    [app.rpc.doc :as-alias doc]
    [app.util.json :as json]
    [app.util.services :as sv]
@@ -101,3 +108,56 @@
                     :code :unable-to-exchange-figma-code
                     :hint "figma rejected the authorization code"
                     :response-status status))))))
+
+
+;; ---------------------------------------------------------------------------
+;; Import
+
+(def ^:private schema:import-figma-file
+  [:map {:title "import-figma-file"}
+   [:token :string]
+   [:file-key :string]
+   [:project-id ::sm/uuid]
+   [:name {:optional true} :string]])
+
+(def ^:private schema:import-figma-file-result
+  [:map {:title "FigmaImportResult"}
+   [:file-id ::sm/uuid]
+   [:name :string]
+   [:report [:map-of :keyword :any]]])
+
+(sv/defmethod ::import-figma-file
+  "Read a Figma file over the REST API and write it as a Gridline file.
+
+  Replaces the plugin round trip for everything the converter understands.
+  What it cannot represent is counted and returned rather than dropped
+  silently -- see app.gridline.figma.convert."
+  {::doc/added "gridline"
+   ::sm/params schema:import-figma-file
+   ::sm/result schema:import-figma-file-result
+   ::db/transaction true}
+  [{:keys [::db/conn] :as cfg} {:keys [::rpc/profile-id token file-key project-id name]}]
+
+  ;; The caller supplies a project id; without this they could write a file
+  ;; into somebody else's project.
+  (projects/check-edition-permissions! conn profile-id project-id)
+
+  (let [document (figma/get-file cfg token file-key)
+
+        {:keys [file report]}
+        (figma.convert/document->file document {:project-id project-id
+                                                :file-name name})
+
+        file (assoc file :project-id project-id)]
+
+    (l/inf :hint "importing figma file"
+           :file-key file-key
+           :pages (:pages report)
+           :shapes (:shapes report)
+           :unsupported (:unsupported report))
+
+    (bfc/save-file! (assoc cfg ::bfc/timestamp (ct/now)) file)
+
+    {:file-id (:id file)
+     :name (:name file)
+     :report report}))
