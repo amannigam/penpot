@@ -1,0 +1,164 @@
+# Penpotter image pipeline.
+#
+# Upstream's build-docker.yml is unusable in a fork: it needs Penpot's
+# self-hosted runners, their S3 bucket and their Docker Hub org. This workflow
+# does the same two steps on stock GitHub runners and publishes to GHCR:
+#
+#   1. build the Penpot bundles inside the penpotapp/devenv image
+#   2. build one Docker image per component from those bundles and push
+#
+# Tags produced:
+#   push to `penpotter`  -> :dev  and :sha-<short>
+#   push of tag v*       -> :release, :<tag> and :sha-<short>
+
+name: Penpotter Images
+
+on:
+  push:
+    branches: [penpotter]
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      platforms:
+        description: 'Target platforms'
+        type: choice
+        default: 'linux/amd64'
+        options: ['linux/amd64', 'linux/amd64,linux/arm64', 'linux/arm64']
+      build_wasm:
+        description: 'Build the WASM render engine'
+        type: boolean
+        default: true
+
+concurrency:
+  group: penpotter-images-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ghcr.io/${{ github.repository_owner }}/penpotter-
+  PLATFORMS: ${{ inputs.platforms || 'linux/amd64' }}
+
+jobs:
+  bundle:
+    name: Build bundles
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Reclaim runner disk
+        # The devenv image plus the CLJS/WASM build easily exceed the ~14GB a
+        # stock runner leaves free. These preinstalled SDKs are dead weight here.
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
+                      /usr/local/share/boost "$AGENT_TOOLSDIRECTORY" || true
+          df -h /
+
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # manage.sh derives the version from `git describe`
+
+      # Authenticated pulls avoid Docker Hub's anonymous rate limit. Non-fatal:
+      # the bundle build still works unauthenticated, just rate-limited.
+      - name: Login to Docker Hub
+        continue-on-error: true
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build bundles
+        env:
+          BUILD_WASM: ${{ (inputs.build_wasm == false) && 'no' || 'yes' }}
+          BUILD_STORYBOOK: 'no'   # not shipped in the penpotter stack
+        run: ./manage.sh build-bundle
+
+      - name: Package bundles
+        run: tar -C bundles -czf bundles.tar.gz .
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: penpot-bundles
+          path: bundles.tar.gz
+          retention-days: 3
+
+  images:
+    name: Image ${{ matrix.image }}
+    needs: bundle
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        image: [frontend, backend, exporter, mcp]
+    steps:
+      - name: Reclaim runner disk
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc || true
+          df -h /
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: penpot-bundles
+
+      - name: Stage this image's bundle into the build context
+        run: |
+          mkdir -p bundles
+          tar -C bundles -xzf bundles.tar.gz
+          mv "bundles/${{ matrix.image }}" "docker/images/bundle-${{ matrix.image }}"
+
+      - uses: docker/setup-qemu-action@v3
+        with:
+          platforms: linux/amd64,linux/arm64
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Penpot's Dockerfiles build FROM dhi.io (Docker Hardened Images). DHI is
+      # free but the registry still requires an authenticated pull, using the
+      # same Docker Hub credentials.
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Login to dhi.io
+        uses: docker/login-action@v3
+        with:
+          registry: dhi.io
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Compute tags
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_PREFIX }}${{ matrix.image }}
+          tags: |
+            type=raw,value=dev,enable=${{ github.ref == 'refs/heads/penpotter' }}
+            type=raw,value=release,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+            type=ref,event=tag
+            type=sha,prefix=sha-,format=short
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: ./docker/images/
+          file: ./docker/images/Dockerfile.${{ matrix.image }}
+          build-args: BUNDLE_PATH=./bundle-${{ matrix.image }}/
+          platforms: ${{ env.PLATFORMS }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.image }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}

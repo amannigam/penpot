@@ -1,0 +1,8 @@
+# Used only when the `caddy` compose profile is enabled.
+# For a Tailscale-only hostname (*.ts.net) Tailscale already provides certs —
+# prefer `tailscale serve` and skip this file. For a real public domain, Caddy
+# will fetch a Let's Encrypt cert automatically.
+{$PENPOT_DOMAIN} {
+	encode zstd gzip
+	reverse_proxy penpot-frontend:8080
+}

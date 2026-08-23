@@ -1,0 +1,162 @@
+## Penpotter — PRODUCTION STACK (home lab)
+##
+## Runs the images built by .github/workflows/penpotter-images.yml and pushed to
+## GHCR. Deployed by penpotter/scripts/deploy-homelab.sh, which rsyncs this
+## directory to the server and runs:
+##
+##   docker compose -p penpotter --env-file .env -f docker-compose.yaml up -d
+##
+## Everything tunable lives in .env — see .env.example.
+
+x-logging: &default-logging
+  driver: json-file
+  options: {max-size: "20m", max-file: "5"}
+
+x-flags: &penpot-flags
+  PENPOT_FLAGS: ${PENPOT_FLAGS:?set PENPOT_FLAGS in .env}
+
+x-uri: &penpot-public-uri
+  PENPOT_PUBLIC_URI: ${PENPOT_PUBLIC_URI:?set PENPOT_PUBLIC_URI in .env}
+
+x-body-size: &penpot-http-body-size
+  # 350MB — large enough for sizeable .fig / .penpot imports.
+  PENPOT_HTTP_SERVER_MAX_BODY_SIZE: ${PENPOT_MAX_BODY_SIZE:-367001600}
+  PENPOT_HTTP_SERVER_MAX_MULTIPART_BODY_SIZE: ${PENPOT_MAX_BODY_SIZE:-367001600}
+
+x-secret-key: &penpot-secret-key
+  PENPOT_SECRET_KEY: ${PENPOT_SECRET_KEY:?set PENPOT_SECRET_KEY in .env}
+
+networks:
+  penpotter:
+
+volumes:
+  penpotter_postgres:
+  penpotter_assets:
+  penpotter_caddy:
+
+services:
+  penpot-frontend:
+    image: "${IMAGE_PREFIX}frontend:${PENPOT_VERSION:?set PENPOT_VERSION in .env}"
+    restart: always
+    logging: *default-logging
+    # Bind to the interface named in .env. Default 127.0.0.1 means "reverse
+    # proxy only" — set PENPOT_BIND=0.0.0.0 to expose on the LAN directly.
+    ports:
+      - "${PENPOT_BIND:-127.0.0.1}:${PENPOT_HTTP_PORT:-9001}:8080"
+    volumes:
+      - penpotter_assets:/opt/data/assets
+    depends_on: [penpot-backend, penpot-exporter, penpot-mcp]
+    networks: [penpotter]
+    environment:
+      <<: [*penpot-flags, *penpot-http-body-size, *penpot-public-uri]
+
+  penpot-backend:
+    image: "${IMAGE_PREFIX}backend:${PENPOT_VERSION}"
+    restart: always
+    logging: *default-logging
+    volumes:
+      - penpotter_assets:/opt/data/assets
+    depends_on:
+      penpot-postgres: {condition: service_healthy}
+      penpot-valkey: {condition: service_healthy}
+    networks: [penpotter]
+    environment:
+      <<: [*penpot-flags, *penpot-public-uri, *penpot-http-body-size, *penpot-secret-key]
+      PENPOT_DATABASE_URI: postgresql://penpot-postgres/penpot
+      PENPOT_DATABASE_USERNAME: ${POSTGRES_USER:-penpot}
+      PENPOT_DATABASE_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      PENPOT_REDIS_URI: redis://penpot-valkey/0
+      PENPOT_OBJECTS_STORAGE_BACKEND: fs
+      PENPOT_OBJECTS_STORAGE_FS_DIRECTORY: /opt/data/assets
+      PENPOT_TELEMETRY_ENABLED: "${PENPOT_TELEMETRY_ENABLED:-false}"
+      PENPOT_SMTP_DEFAULT_FROM: ${PENPOT_SMTP_DEFAULT_FROM}
+      PENPOT_SMTP_DEFAULT_REPLY_TO: ${PENPOT_SMTP_DEFAULT_REPLY_TO}
+      PENPOT_SMTP_HOST: ${PENPOT_SMTP_HOST}
+      PENPOT_SMTP_PORT: ${PENPOT_SMTP_PORT}
+      PENPOT_SMTP_USERNAME: ${PENPOT_SMTP_USERNAME}
+      PENPOT_SMTP_PASSWORD: ${PENPOT_SMTP_PASSWORD}
+      PENPOT_SMTP_TLS: "${PENPOT_SMTP_TLS:-true}"
+      PENPOT_SMTP_SSL: "${PENPOT_SMTP_SSL:-false}"
+
+  penpot-exporter:
+    image: "${IMAGE_PREFIX}exporter:${PENPOT_VERSION}"
+    restart: always
+    logging: *default-logging
+    depends_on:
+      penpot-valkey: {condition: service_healthy}
+    networks: [penpotter]
+    environment:
+      <<: [*penpot-secret-key, *penpot-public-uri]
+      PENPOT_INTERNAL_URI: http://penpot-frontend:8080
+      PENPOT_REDIS_URI: redis://penpot-valkey/0
+
+  penpot-mcp:
+    image: "${IMAGE_PREFIX}mcp:${PENPOT_VERSION}"
+    restart: always
+    logging: *default-logging
+    networks: [penpotter]
+
+  penpot-postgres:
+    image: "postgres:15"
+    restart: always
+    stop_signal: SIGINT
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-penpot}"]
+      interval: 2s
+      timeout: 10s
+      retries: 5
+      start_period: 2s
+    volumes:
+      - penpotter_postgres:/var/lib/postgresql/data
+    networks: [penpotter]
+    environment:
+      POSTGRES_INITDB_ARGS: --data-checksums
+      POSTGRES_DB: ${POSTGRES_DB:-penpot}
+      POSTGRES_USER: ${POSTGRES_USER:-penpot}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    # Tuning for a 16GB host. Adjust to ~25% of RAM for shared_buffers.
+    command:
+      - postgres
+      - -c
+      - shared_buffers=${PG_SHARED_BUFFERS:-1GB}
+      - -c
+      - effective_cache_size=${PG_EFFECTIVE_CACHE_SIZE:-3GB}
+      - -c
+      - work_mem=${PG_WORK_MEM:-16MB}
+      - -c
+      - maintenance_work_mem=${PG_MAINTENANCE_WORK_MEM:-256MB}
+      - -c
+      - max_connections=${PG_MAX_CONNECTIONS:-100}
+
+  penpot-valkey:
+    image: valkey/valkey:8.1
+    restart: always
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD-SHELL", "valkey-cli ping | grep PONG"]
+      interval: 1s
+      timeout: 3s
+      retries: 5
+      start_period: 3s
+    networks: [penpotter]
+    environment:
+      # Penpot's recommended settings: RAM-only, 128mb cap, volatile-lfu eviction.
+      VALKEY_EXTRA_FLAGS: --maxmemory ${VALKEY_MAXMEMORY:-128mb} --maxmemory-policy volatile-lfu
+
+  ## Optional TLS terminator. Enable with:  --profile caddy
+  ## Needs PENPOT_DOMAIN set and ports 80/443 free on the host.
+  caddy:
+    image: caddy:2
+    profiles: [caddy]
+    restart: always
+    logging: *default-logging
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - penpotter_caddy:/data
+    networks: [penpotter]
+    environment:
+      PENPOT_DOMAIN: ${PENPOT_DOMAIN}

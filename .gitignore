@@ -104,3 +104,8 @@ opencode.json
 /.ci-logs
 /.codex/
 /tools/__pycache__
+
+# --- penpotter -----------------------------------------------------------
+penpotter/dev/.env
+penpotter/prod/.env
+penpotter/scripts/homelab.env
