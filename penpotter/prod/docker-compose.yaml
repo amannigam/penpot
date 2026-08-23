@@ -70,6 +70,18 @@ services:
       # min-size = max-size). That must stay comfortably below Postgres'
       # max_connections, which also reserves 3 slots for superusers.
       PENPOT_DATABASE_MAX_POOL_SIZE: ${PENPOT_DB_POOL_SIZE:-20}
+
+      ## Social login. All providers share ONE callback:
+      ##   ${PENPOT_PUBLIC_URI}/api/auth/oidc/callback
+      ## Empty values are harmless: a provider is only wired up when its
+      ## enable-login-with-* flag is in PENPOT_FLAGS.
+      PENPOT_GOOGLE_CLIENT_ID: ${PENPOT_GOOGLE_CLIENT_ID}
+      PENPOT_GOOGLE_CLIENT_SECRET: ${PENPOT_GOOGLE_CLIENT_SECRET}
+      PENPOT_GITHUB_CLIENT_ID: ${PENPOT_GITHUB_CLIENT_ID}
+      PENPOT_GITHUB_CLIENT_SECRET: ${PENPOT_GITHUB_CLIENT_SECRET}
+      ## Who is allowed to create an account at all. Without this, anyone with
+      ## any Google account who can reach the tailnet gets in.
+      PENPOT_REGISTRATION_DOMAIN_WHITELIST: ${PENPOT_REGISTRATION_DOMAIN_WHITELIST}
       PENPOT_REDIS_URI: redis://penpot-valkey/0
       PENPOT_OBJECTS_STORAGE_BACKEND: fs
       PENPOT_OBJECTS_STORAGE_FS_DIRECTORY: /opt/data/assets
