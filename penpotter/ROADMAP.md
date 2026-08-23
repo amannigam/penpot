@@ -45,6 +45,32 @@ So Apple = a real fork change (an Apple provider with JWT secret minting, plus a
 POST-capable callback) *and* a recurring cost. Deferred until Google and GitHub
 are proven and there is a budget.
 
+**Verification is for passwords, not for providers.** A signup through Google,
+GitHub or Apple has already had its identity established by the provider, so
+Penpot has nothing left to verify and the user should land in the app. Email +
+password signups keep mandatory verification.
+
+Google already behaves this way — OIDC providers return the standard
+`email_verified` claim and `auth.clj:449` creates the profile active when it is
+true. GitHub did not, because of a dropped field: `/user/emails` reports
+`verified` per address and `lookup-github-email` kept only the address. Fixed in
+this fork by preserving the flag (`oidc.clj`), which also generalised the
+`::get-email-fn` hook to return `{:email, :verified}` so any future provider can
+report the same thing. The public profile email from `/user` is deliberately
+still treated as unverified — GitHub makes no ownership guarantee about it.
+
+Apple, when it lands, gets the same treatment: it authenticates the user, so no
+verification mail.
+
+**Still open: a banner for unverified accounts.** If someone does sign up with a
+password, they are blocked at "Check your email!" until they click the link. On
+an instance whose SMTP is a local sink, that is a dead end for anyone but an
+admin. The intended behaviour is to let them into the app and show a persistent
+"verify your email" banner instead. That needs `is-active` to stop meaning both
+"verified" and "may log in" — the cheap version is to create the profile active
+and carry an unverified marker in profile props for the banner to read, rather
+than unpicking every `is-active` guard.
+
 **Ordering note.** Do not set `disable-login-with-password` until a provider
 login has actually worked once — the existing account was created with a
 password, and turning the form off first locks everyone out. Penpot links a

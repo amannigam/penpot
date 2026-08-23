@@ -231,24 +231,36 @@
   (and (<= start val) (< val end)))
 
 (defn- lookup-github-email
+  "Returns {:email ... :verified bool} for the GitHub account.
+
+  GitHub's /user/emails reports, per address, whether GitHub has verified
+  ownership of it. Upstream read only the address and discarded that flag,
+  which sent every GitHub signup through Penpot's own email verification even
+  though GitHub had already proven the address. We keep the flag.
+
+  The public profile email exposed by /user carries no such guarantee, so when
+  it is used as a fallback the address stays unverified."
   [cfg tdata props]
-  (or (some-> props :github/email)
-      (let [params {:uri "https://api.github.com/user/emails"
-                    :headers {"Authorization" (dm/str (:token/type tdata) " " (:token/access tdata))}
-                    :timeout 6000
-                    :method :get}
+  (if-let [email (some-> props :github/email)]
+    {:email email :verified false}
+    (let [params {:uri "https://api.github.com/user/emails"
+                  :headers {"Authorization" (dm/str (:token/type tdata) " " (:token/access tdata))}
+                  :timeout 6000
+                  :method :get}
 
-            {:keys [status body]} (http/req cfg params)]
+          {:keys [status body]} (http/req cfg params)]
 
-        (when-not (int-in-range? status 200 300)
-          (ex/raise :type :internal
-                    :code :unable-to-retrieve-github-emails
-                    :hint "unable to retrieve github emails"
-                    :request-uri (:uri params)
-                    :response-status status
-                    :response-body body))
+      (when-not (int-in-range? status 200 300)
+        (ex/raise :type :internal
+                  :code :unable-to-retrieve-github-emails
+                  :hint "unable to retrieve github emails"
+                  :request-uri (:uri params)
+                  :response-status status
+                  :response-body body))
 
-        (->> body json/decode (filter :primary) first :email))))
+      (let [primary (->> body json/decode (filter :primary) first)]
+        {:email (:email primary)
+         :verified (true? (:verified primary))}))))
 
 (defn- get-github-config
   [cfg]
@@ -476,14 +488,19 @@
 
 (defn- process-user-info
   [provider tdata info]
-  (letfn [(get-email [props]
+  (letfn [(get-email-info [props]
             ;; Allow providers hook into this for custom email
-            ;; retrieval method.
+            ;; retrieval method. The hook returns a map so a provider can
+            ;; also report whether it verified the address itself; a plain
+            ;; string is still accepted and means "no opinion".
             (if-let [get-email-fn (::get-email-fn provider)]
-              (get-email-fn tdata props)
+              (let [result (get-email-fn tdata props)]
+                (if (map? result)
+                  result
+                  {:email result :verified nil}))
               (let [attr-kw (get provider :email-attr "email")
                     attr-ph (parse-attr-path provider attr-kw)]
-                (get-in props attr-ph))))
+                {:email (get-in props attr-ph) :verified nil})))
 
           (get-name [props]
             (or (let [attr-kw (get provider :name-attr "name")
@@ -492,13 +509,21 @@
                 (let [attr-ph (parse-attr-path provider "nickname")]
                   (get-in props attr-ph))))]
 
-    (let [info    (assoc info :provider-id (str (:id provider)))
-          props   (qualify-props provider info)
-          email   (get-email props)]
+    (let [info       (assoc info :provider-id (str (:id provider)))
+          props      (qualify-props provider info)
+          email-info (get-email-info props)
+          email      (:email email-info)]
       {:backend  (:type provider)
        :fullname (or (get-name props) email)
        :email email
-       :email-verified (get info :email_verified false)
+       ;; When the provider states it has verified the address, Penpot has
+       ;; nothing left to verify: the profile is created active and no
+       ;; verification mail is sent. Providers with no opinion fall back to
+       ;; the standard OIDC email_verified claim, and absent that, to false --
+       ;; which keeps email/password signups on the mandatory path.
+       :email-verified (if (some? (:verified email-info))
+                         (:verified email-info)
+                         (get info :email_verified false))
        :props props})))
 
 (defn- fetch-user-info
