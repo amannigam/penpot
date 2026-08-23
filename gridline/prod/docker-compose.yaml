@@ -101,6 +101,13 @@ services:
       PENPOT_GOOGLE_CLIENT_SECRET: ${PENPOT_GOOGLE_CLIENT_SECRET}
       PENPOT_GITHUB_CLIENT_ID: ${PENPOT_GITHUB_CLIENT_ID}
       PENPOT_GITHUB_CLIENT_SECRET: ${PENPOT_GITHUB_CLIENT_SECRET}
+
+      ## Figma OAuth. The backend needs BOTH: the secret is what the token
+      ## exchange authenticates with, and the id is half of that credential
+      ## pair. The frontend separately gets only the id, to build the
+      ## authorize URL.
+      PENPOT_FIGMA_CLIENT_ID: ${PENPOT_FIGMA_CLIENT_ID}
+      PENPOT_FIGMA_CLIENT_SECRET: ${PENPOT_FIGMA_CLIENT_SECRET}
       ## Who is allowed to create an account at all. Without this, anyone with
       ## any Google account who can reach the tailnet gets in.
       PENPOT_REGISTRATION_DOMAIN_WHITELIST: ${PENPOT_REGISTRATION_DOMAIN_WHITELIST}
