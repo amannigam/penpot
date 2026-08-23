@@ -184,6 +184,28 @@ token never reaches our backend and is never stored) and
 `app.main.ui.onboarding.figma-import` (intro → connect → checklist, with
 deep links, zip-to-row matching by squashed name, and progress).
 
+**Built 2026-08-23: a real importer.** `gridline/IMPORTER.md` has the design.
+The picker's Import button reads the file over Figma's REST API and writes a
+Gridline file directly -- no plugin, no zip, no per-file clicking. It drives
+`common/src/app/common/files/builder.cljc`, which is what `@penpot/library`
+(the package the exporter plugin uses) is compiled from, and persists with
+`bfc/save-file!`.
+
+Converts pages, frames, groups, rectangles, ellipses, text and lines with
+geometry, solid fills, strokes, corner radius and opacity. Does NOT convert
+vectors, gradients, images, components, auto-layout or effects -- those become
+counted placeholders and the count is reported. Keep that honesty.
+
+Next for the importer, roughly in order of value:
+1. **Images** -- fetch `imageRef` fills via `/v1/files/:key/images`, store as
+   file media. Probably the biggest visible gap.
+2. **Vectors** -- `?geometry=paths` returns fill/stroke path data; map to
+   Penpot `:path` shapes. The other big gap.
+3. **Gradients** -- linear and radial map fairly directly onto Penpot fills.
+4. **Components** -- Figma COMPONENT/INSTANCE onto Penpot components, so
+   instances stay linked rather than flattened to boards.
+5. **Auto-layout** -- Figma layout modes onto Penpot flex layout.
+
 **Still open.** Auto-matching depends on the exporter naming its zip after the
 file; unmatched zips import fine but leave the row unticked. The worklist is
 component state, so it does not survive a reload yet — persist it in profile
