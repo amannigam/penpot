@@ -4780,7 +4780,7 @@ msgstr "Connect Figma"
 
 #: src/app/main/ui/onboarding/figma_import.cljs
 msgid "onboarding.figma-import.connect-desc"
-msgstr "Two things from Figma, used only in your browser and never stored on this server."
+msgstr "Sign in to Figma and pick a team. The connection lives in your browser only, and nothing is stored on this server."
 
 #: src/app/main/ui/onboarding/figma_import.cljs
 msgid "onboarding.figma-import.done"
@@ -4801,6 +4801,18 @@ msgstr "That doesn't look like a team id or a Figma team URL."
 #: src/app/main/ui/onboarding/figma_import.cljs
 msgid "onboarding.figma-import.error-no-token"
 msgstr "Paste a Figma personal access token first."
+
+#: src/app/main/ui/onboarding/figma_import.cljs
+msgid "onboarding.figma-import.error-connect"
+msgstr "Couldn't connect to Figma. Try again."
+
+#: src/app/main/ui/onboarding/figma_import.cljs
+msgid "onboarding.figma-import.error-popup"
+msgstr "Your browser blocked the Figma window. Allow popups for this site and try again."
+
+#: src/app/main/ui/onboarding/figma_import.cljs
+msgid "onboarding.figma-import.error-state"
+msgstr "That response didn't match this request, so it was ignored. Try connecting again."
 
 #: src/app/main/ui/onboarding/figma_import.cljs
 msgid "onboarding.figma-import.file-imported"
@@ -4833,18 +4845,6 @@ msgstr "Figma can't tell us your teams, so paste the team URL from your Figma br
 #: src/app/main/ui/onboarding/figma_import.cljs
 msgid "onboarding.figma-import.team-label"
 msgstr "Team URL or id"
-
-#: src/app/main/ui/onboarding/figma_import.cljs
-msgid "onboarding.figma-import.token-help"
-msgstr "Create one in Figma under Settings → Security → Personal access tokens."
-
-#: src/app/main/ui/onboarding/figma_import.cljs
-msgid "onboarding.figma-import.token-help-link"
-msgstr "How to create a token"
-
-#: src/app/main/ui/onboarding/figma_import.cljs
-msgid "onboarding.figma-import.token-label"
-msgstr "Personal access token"
 
 #: src/app/main/ui/onboarding/figma_import.cljs
 msgid "onboarding.figma-import.caveat"

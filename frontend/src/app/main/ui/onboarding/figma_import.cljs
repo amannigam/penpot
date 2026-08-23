@@ -41,9 +41,6 @@
 (def ^:const plugin-uri
   "https://www.figma.com/community/plugin/1219369440655168734/penpot-exporter")
 
-(def ^:const token-help-uri
-  "https://www.figma.com/developers/api#access-tokens")
-
 (defn- finish!
   [label]
   (st/emit! (du/update-profile-props {:gridline-figma-import-viewed true})
@@ -101,7 +98,7 @@
                (:id)))
 
         phase*     (mf/use-state :intro)
-        token*     (mf/use-state "")
+        token*     (mf/use-state nil)   ;; obtained via OAuth; never persisted
         team-ref*  (mf/use-state "")
         error*     (mf/use-state nil)
         loading*   (mf/use-state false)
@@ -115,12 +112,11 @@
         (mf/with-memo [@groups*]
           (into [] (mapcat :files) @groups*))
 
-        on-connect
+        list-files!
         (mf/use-fn
-         (mf/deps @token* @team-ref*)
-         (fn []
-           (let [token   @token*
-                 team-id (figma/parse-team-id @team-ref*)]
+         (mf/deps @team-ref*)
+         (fn [token]
+           (let [team-id (figma/parse-team-id @team-ref*)]
              (cond
                (str/blank? token)
                (reset! error* (tr "onboarding.figma-import.error-no-token"))
@@ -144,6 +140,27 @@
                          (reset! phase* :files)
                          (st/emit! (ev/event {::ev/name "onboarding-step"
                                               :label "figma-import:listed"}))))))))))
+
+        on-connect
+        (mf/use-fn
+         (mf/deps list-files! @team-ref*)
+         (fn []
+           (if (nil? (figma/parse-team-id @team-ref*))
+             (reset! error* (tr "onboarding.figma-import.error-bad-team"))
+             (do
+               (reset! error* nil)
+               (reset! loading* true)
+               (figma/open-authorization-popup!
+                (fn [{:keys [access-token error]}]
+                  (if (some? access-token)
+                    (do (reset! token* access-token)
+                        (list-files! access-token))
+                    (do (reset! loading* false)
+                        (reset! error*
+                                (case error
+                                  :popup-blocked  (tr "onboarding.figma-import.error-popup")
+                                  :state-mismatch (tr "onboarding.figma-import.error-state")
+                                  (tr "onboarding.figma-import.error-connect")))))))))))
 
         on-toggle
         (mf/use-fn
@@ -226,24 +243,6 @@
         [:*
          [:> text* {:as "div" :typography t/body-large :class (stl/css :color-dimmed)}
           (tr "onboarding.figma-import.connect-desc")]
-
-         [:div {:class (stl/css :field)}
-          [:label {:class (stl/css :field-label)}
-           (tr "onboarding.figma-import.token-label")]
-          [:input {:class (stl/css :field-input)
-                   :type "password"
-                   :auto-complete "off"
-                   :placeholder "figd_..."
-                   :value @token*
-                   :on-change #(reset! token* (dom/get-target-val %))}]
-          [:> text* {:as "div" :typography t/body-small :class (stl/css :color-dimmed)}
-           (tr "onboarding.figma-import.token-help")
-           " "
-           [:a {:class (stl/css :link)
-                :href token-help-uri
-                :target "_blank"
-                :rel "noopener noreferrer"}
-            (tr "onboarding.figma-import.token-help-link")]]]
 
          [:div {:class (stl/css :field)}
           [:label {:class (stl/css :field-label)}

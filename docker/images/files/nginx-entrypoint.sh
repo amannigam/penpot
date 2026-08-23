@@ -44,8 +44,17 @@ update_oidc_name() {
   fi
 }
 
+update_figma_client_id() {
+  if [ -n "$PENPOT_FIGMA_CLIENT_ID" ]; then
+    echo "$(sed \
+      -e "s|^//var penpotFigmaClientId = .*;|var penpotFigmaClientId = \"$PENPOT_FIGMA_CLIENT_ID\";|g" \
+      "$1")" > "$1"
+  fi
+}
+
 update_flags /var/www/app/js/config.js
 update_oidc_name /var/www/app/js/config.js
+update_figma_client_id /var/www/app/js/config.js
 
 #########################################
 ## Nginx Config

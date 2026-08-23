@@ -17,6 +17,8 @@
   its transformers are written against Figma's *plugin* API (live nodes,
   `image.getBytesAsync`), which the REST API does not expose."
   (:require
+   [app.config :as cf]
+   [app.main.repo :as rp]
    [app.util.http :as http]
    [beicon.v2.core :as rx]
    [cuerdas.core :as str]))
@@ -110,3 +112,144 @@
       (str/lower)
       (str/replace #"\.(zip|penpot)$" "")
       (str/replace #"[^a-z0-9]+" "")))
+
+;; ---------------------------------------------------------------------------
+;; OAuth
+;;
+;; The browser drives the authorization step and holds the resulting token; the
+;; backend only performs the code-for-token exchange, because Figma requires the
+;; client secret for it. PKCE is used as well as the secret, not instead of it.
+
+(def ^:const authorize-uri "https://www.figma.com/oauth")
+
+;; Read-only, and the narrowest scope that still lists files.
+(def ^:const scopes "files:read")
+
+(defn- base64url
+  [^js buffer]
+  (-> (.btoa js/window (.apply js/String.fromCharCode nil (js/Uint8Array. buffer)))
+      (str/replace "+" "-")
+      (str/replace "/" "_")
+      (str/replace "=" "")))
+
+(defn random-verifier
+  "A PKCE code verifier: 32 random bytes, base64url encoded."
+  []
+  (let [bytes (js/Uint8Array. 32)]
+    (.getRandomValues js/crypto bytes)
+    (base64url (.-buffer bytes))))
+
+(defn code-challenge
+  "S256 challenge for a verifier. Async -- crypto.subtle returns a promise --
+  so this yields a stream of one value. S256 is the only method Figma accepts."
+  [verifier]
+  (->> (rx/from (.digest (.-subtle js/crypto) "SHA-256"
+                         (.encode (js/TextEncoder.) verifier)))
+       (rx/map base64url)))
+
+(defn build-authorize-uri
+  [{:keys [redirect-uri state challenge]}]
+  (let [params {:client_id cf/figma-client-id
+                :redirect_uri redirect-uri
+                :scope scopes
+                :state state
+                :response_type "code"
+                :code_challenge challenge
+                :code_challenge_method "S256"}]
+    (str authorize-uri "?"
+         (str/join "&" (map (fn [[k v]]
+                              (str (name k) "=" (js/encodeURIComponent (str v))))
+                            params)))))
+
+(defn exchange-code
+  "Hand the authorization code to our backend, which holds the client secret.
+  Returns a stream of {:access-token ... :expires-in ...}."
+  [{:keys [code verifier redirect-uri]}]
+  (rp/cmd! :exchange-figma-code {:code code
+                                 :code-verifier verifier
+                                 :redirect-uri redirect-uri}))
+
+(defn configured?
+  []
+  (not (str/blank? cf/figma-client-id)))
+
+;; --- popup plumbing --------------------------------------------------------
+;;
+;; Figma redirects back to the app origin. Rather than add a route (and boot the
+;; whole SPA) for what is a two-line handoff, the authorization happens in a
+;; popup: the popup posts the code to its opener and closes, and the opener --
+;; which is the only window holding the PKCE verifier -- does the exchange.
+
+(def ^:const message-type "gridline-figma-oauth")
+
+(defn redirect-uri
+  "Must match the URI registered on the Figma OAuth app exactly. Figma rejects
+  any mismatch, so this is derived from the running origin rather than typed."
+  []
+  (str (.-origin (.-location js/window)) "/"))
+
+(defn handle-popup-callback!
+  "True when this document is the OAuth popup, in which case the code has been
+  handed to the opener and the window is closing. False for a normal load."
+  []
+  (let [params (js/URLSearchParams. (.-search (.-location js/window)))
+        code   (.get params "code")
+        state  (.get params "state")
+        error  (.get params "error")
+        opener (.-opener js/window)]
+    (if (and (some? opener) (or (some? code) (some? error)))
+      (do
+        (.postMessage opener
+                      #js {:type message-type
+                           :code code
+                           :state state
+                           :error error}
+                      (.-origin (.-location js/window)))
+        (.close js/window)
+        true)
+      false)))
+
+(defn open-authorization-popup!
+  "Starts the flow and calls back with {:access-token ...} or {:error ...}.
+
+  Verifier and state stay in this window's closure: the popup never sees them,
+  and nothing is written to storage."
+  [on-result]
+  (let [verifier (random-verifier)
+        state    (random-verifier)
+        redirect (redirect-uri)]
+    (->> (code-challenge verifier)
+         (rx/subs!
+          (fn [challenge]
+            (let [uri    (build-authorize-uri {:redirect-uri redirect
+                                               :state state
+                                               :challenge challenge})
+                  popup  (.open js/window uri "gridline-figma-oauth"
+                                "width=520,height=720,menubar=no,toolbar=no")
+                  listener (atom nil)]
+
+              (if (nil? popup)
+                (on-result {:error :popup-blocked})
+
+                (reset! listener
+                        (fn handler [^js event]
+                          (when (and (= (.-origin event) (.-origin (.-location js/window)))
+                                     (= message-type (some-> event .-data .-type)))
+                            (.removeEventListener js/window "message" handler)
+                            (let [data  (.-data event)
+                                  code  (.-code data)
+                                  ;; Comparing state is what stops another tab's
+                                  ;; callback being accepted as ours.
+                                  ok?   (= state (.-state data))]
+                              (cond
+                                (some? (.-error data)) (on-result {:error (.-error data)})
+                                (not ok?)              (on-result {:error :state-mismatch})
+                                (nil? code)            (on-result {:error :no-code})
+                                :else
+                                (->> (exchange-code {:code code
+                                                     :verifier verifier
+                                                     :redirect-uri redirect})
+                                     (rx/subs! (fn [result] (on-result result))
+                                               (fn [cause] (on-result {:error cause}))))))))))
+              (when-let [h @listener]
+                (.addEventListener js/window "message" h))))))))

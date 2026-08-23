@@ -14,6 +14,7 @@
    [app.config :as cf]
    [app.main.data.auth :as da]
    [app.main.data.event :as ev]
+   [app.main.data.gridline.figma :as gfigma]
    [app.main.data.profile :as dp]
    [app.main.data.websocket :as ws]
    [app.main.errors]
@@ -116,13 +117,23 @@
                      (t/encode-str)
                      (t/decode-str)))
 
-  ;; Before initializing anything, check if the browser has loaded
-  ;; stale JS from a previous deployment. If so, do a hard reload so
-  ;; the browser fetches fresh assets matching the current index.html.
-  (if (cf/stale-build?)
+  (cond
+    ;; Gridline: this document is the popup Figma redirected back to. Its only
+    ;; job is to hand the authorization code to the window that opened it and
+    ;; close. Booting the app here would be waste, and the opener holds the
+    ;; PKCE verifier anyway.
+    (gfigma/handle-popup-callback!)
+    nil
+
+    ;; Before initializing anything, check if the browser has loaded
+    ;; stale JS from a previous deployment. If so, do a hard reload so
+    ;; the browser fetches fresh assets matching the current index.html.
+    (cf/stale-build?)
     (cf/throttled-reload
      :reason (dm/str "stale JS: compiled=" cf/compiled-version-tag
                      " expected=" cf/version-tag))
+
+    :else
     (do
       (some-> (unchecked-get options "defaultTranslations")
               (i18n/set-default-translations))

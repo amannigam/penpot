@@ -159,6 +159,7 @@
 (def saas?                (obj/get global "penpotIsSaas" false))
 (def terms-of-service-uri (obj/get global "penpotTermsOfServiceURI"))
 (def oidc-name            (obj/get global "penpotOIDCName"))
+(def figma-client-id      (obj/get global "penpotFigmaClientId"))
 (def privacy-policy-uri   (obj/get global "penpotPrivacyPolicyURI"))
 (def flex-help-uri        (obj/get global "penpotGridHelpURI" "https://help.penpot.app/user-guide/flexible-layouts/"))
 (def grid-help-uri        (obj/get global "penpotGridHelpURI" "https://help.penpot.app/user-guide/flexible-layouts/"))
