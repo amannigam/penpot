@@ -38,6 +38,16 @@
       (re-matches #"\d+" input) input
       :else (second (re-find #"/team/(\d+)" input)))))
 
+(defn parse-team-ids
+  "Several teams, comma or whitespace separated. Figma has no endpoint that
+  lists them, so each one has to be named explicitly."
+  [input]
+  (->> (str/split (or input "") #"[,\s]+")
+       (map parse-team-id)
+       (filter some?)
+       (distinct)
+       (vec)))
+
 (defn- error-message
   [status body]
   (or (get body :err)
@@ -88,24 +98,38 @@
   [token folder-id]
   (request token (str "/v2/folders/" folder-id "/files")))
 
-(defn list-team-files
-  "Every folder in a team, each with its files.
-
-  Emits once, with [{:project {:id :name} :files [...]} ...]. The key stays
-  :project because that is the word the UI shows and the word Figma's own
-  interface still uses."
+(defn- list-one-team
   [token team-id]
   (->> (list-folders token team-id)
-       (rx/mapcat (fn [{:keys [folders]}]
+       (rx/mapcat (fn [{:keys [name folders]}]
                     (if (seq folders)
                       (->> (rx/from folders)
                            (rx/mapcat (fn [folder]
                                         (->> (list-folder-files token (:id folder))
                                              (rx/map (fn [{:keys [files]}]
-                                                       {:project folder
+                                                       {:team {:id team-id :name name}
+                                                        :project folder
                                                         :files (vec files)}))))))
-                      (rx/of nil))))
-       (rx/filter some?)
+                      (rx/of {:team {:id team-id :name name}
+                              :project nil
+                              :files []}))))
+       ;; One inaccessible team must not blank the whole list: somebody can
+       ;; easily be a member of one team and not another (Figma answers 403
+       ;; "Permission denied"), and the useful thing is to show what they can
+       ;; see and name what they cannot.
+       (rx/catch (fn [cause]
+                   (rx/of {:team {:id team-id}
+                           :error (or (:message cause) "unavailable")
+                           :files []})))))
+
+(defn list-team-files
+  "Every folder in every given team, each with its files.
+
+  Emits once, with [{:team {..} :project {..} :files [...]} ...]. Entries that
+  failed carry :error instead of a project."
+  [token team-ids]
+  (->> (rx/from (vec team-ids))
+       (rx/mapcat (partial list-one-team token))
        (rx/reduce conj [])))
 
 (defn file-uri
@@ -187,103 +211,10 @@
   []
   (not (str/blank? cf/figma-client-id)))
 
-(defn configured-team-id
-  "Figma has no endpoint that lists a user's teams, and no scope for it -- the
-  id can only be read out of a browser URL. That is a property of the
-  organisation, not of each person, so an admin sets it once via
-  PENPOT_FIGMA_TEAM_ID and nobody else is ever asked."
+(defn configured-team-ids
+  "Figma has no endpoint that lists a user's teams, and no scope for it -- ids
+  can only be read out of a browser URL. That is a property of the
+  organisation, not of each person, so an admin sets them once via
+  PENPOT_FIGMA_TEAM_ID (comma separated for several) and nobody else is asked."
   []
-  (let [v (str/trim (or cf/figma-team-id ""))]
-    (when-not (str/blank? v) (parse-team-id v))))
-
-;; --- popup plumbing --------------------------------------------------------
-;;
-;; Figma redirects back to the app origin. Rather than add a route (and boot the
-;; whole SPA) for what is a two-line handoff, the authorization happens in a
-;; popup: the popup posts the code to its opener and closes, and the opener --
-;; which is the only window holding the PKCE verifier -- does the exchange.
-
-(def ^:const message-type "gridline-figma-oauth")
-
-(defn redirect-uri
-  "Must match the URI registered on the Figma OAuth app exactly. Figma rejects
-  any mismatch, so this is derived from the running origin rather than typed."
-  []
-  (str (.-origin (.-location js/window)) "/"))
-
-(defn handle-popup-callback!
-  "True when this document is the OAuth popup, in which case the code has been
-  handed to the opener and the window is closing. False for a normal load."
-  []
-  (let [params (js/URLSearchParams. (.-search (.-location js/window)))
-        code   (.get params "code")
-        state  (.get params "state")
-        error  (.get params "error")
-        opener (.-opener js/window)]
-    (if (and (some? opener) (or (some? code) (some? error)))
-      (do
-        (.postMessage opener
-                      #js {:type message-type
-                           :code code
-                           :state state
-                           :error error
-                           ;; Figma explains itself here ("Invalid scopes for
-                           ;; app", redirect mismatches...). Losing it leaves
-                           ;; nothing to debug from.
-                           :errorDescription (.get params "error_description")}
-                      (.-origin (.-location js/window)))
-        (.close js/window)
-        true)
-      false)))
-
-(defn open-authorization-popup!
-  "Starts the flow and calls back with {:access-token ...} or {:error ...}.
-
-  Verifier and state stay in this window's closure: the popup never sees them,
-  and nothing is written to storage."
-  [on-result]
-  (let [verifier (random-verifier)
-        state    (random-verifier)
-        redirect (redirect-uri)]
-    (->> (code-challenge verifier)
-         (rx/subs!
-          (fn [challenge]
-            (let [uri    (build-authorize-uri {:redirect-uri redirect
-                                               :state state
-                                               :challenge challenge})
-                  popup  (.open js/window uri "gridline-figma-oauth"
-                                "width=520,height=720,menubar=no,toolbar=no")
-                  listener (atom nil)]
-
-              (if (nil? popup)
-                (on-result {:error :popup-blocked})
-
-                (reset! listener
-                        (fn handler [^js event]
-                          (when (and (= (.-origin event) (.-origin (.-location js/window)))
-                                     (= message-type (some-> event .-data .-type)))
-                            (.removeEventListener js/window "message" handler)
-                            (let [data  (.-data event)
-                                  code  (.-code data)
-                                  ;; Comparing state is what stops another tab's
-                                  ;; callback being accepted as ours.
-                                  ok?   (= state (.-state data))]
-                              (cond
-                                (some? (.-error data))
-                                (on-result {:error (.-error data)
-                                            :detail (.-errorDescription data)})
-                                (not ok?)              (on-result {:error :state-mismatch})
-                                (nil? code)            (on-result {:error :no-code})
-                                :else
-                                (->> (exchange-code {:code code
-                                                     :verifier verifier
-                                                     :redirect-uri redirect})
-                                     (rx/subs! (fn [result] (on-result result))
-                                               (fn [cause]
-                                                 (on-result
-                                                  {:error :exchange-failed
-                                                   :detail (or (some-> cause ex-data :hint)
-                                                               (ex-message cause)
-                                                               (str cause))}))))))))))
-              (when-let [h @listener]
-                (.addEventListener js/window "message" h))))))))
+  (parse-team-ids cf/figma-team-id))

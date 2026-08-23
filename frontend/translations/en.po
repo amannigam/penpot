@@ -4840,7 +4840,7 @@ msgstr "Select all"
 
 #: src/app/main/ui/onboarding/figma_import.cljs
 msgid "onboarding.figma-import.team-help"
-msgstr "Figma can't tell us your teams, so paste the team URL from your Figma browser tab."
+msgstr "Figma can't tell us your teams, so paste the team URL from your Figma browser tab. Several teams: separate them with commas."
 
 #: src/app/main/ui/onboarding/figma_import.cljs
 msgid "onboarding.figma-import.team-label"
@@ -4886,6 +4886,10 @@ msgid "onboarding.figma-import.subtitle"
 msgstr ""
 "Figma has no bulk export, so this takes a plugin and a few clicks per file. "
 "Here is the whole of it."
+
+#: src/app/main/ui/onboarding/figma_import.cljs
+msgid "onboarding.figma-import.team-unavailable"
+msgstr "This team couldn't be read with your Figma account:"
 
 #: src/app/main/ui/onboarding/figma_import.cljs
 msgid "onboarding.figma-import.title"

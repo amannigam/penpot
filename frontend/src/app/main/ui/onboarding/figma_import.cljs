@@ -99,7 +99,7 @@
 
         phase*     (mf/use-state :intro)
         token*     (mf/use-state nil)   ;; obtained via OAuth; never persisted
-        team-ref*  (mf/use-state (or (figma/configured-team-id) ""))
+        team-ref*  (mf/use-state (str/join ", " (figma/configured-team-ids)))
         error*     (mf/use-state nil)
         loading*   (mf/use-state false)
         groups*    (mf/use-state nil)
@@ -116,19 +116,19 @@
         (mf/use-fn
          (mf/deps @team-ref*)
          (fn [token]
-           (let [team-id (figma/parse-team-id @team-ref*)]
+           (let [team-ids (figma/parse-team-ids @team-ref*)]
              (cond
                (str/blank? token)
                (reset! error* (tr "onboarding.figma-import.error-no-token"))
 
-               (nil? team-id)
+               (empty? team-ids)
                (reset! error* (tr "onboarding.figma-import.error-bad-team"))
 
                :else
                (do
                  (reset! error* nil)
                  (reset! loading* true)
-                 (->> (figma/list-team-files token team-id)
+                 (->> (figma/list-team-files token team-ids)
                       (rx/catch (fn [cause]
                                   (reset! loading* false)
                                   (reset! error* (get cause :message))
@@ -145,7 +145,7 @@
         (mf/use-fn
          (mf/deps list-files! @team-ref*)
          (fn []
-           (if (nil? (figma/parse-team-id @team-ref*))
+           (if (empty? (figma/parse-team-ids @team-ref*))
              (reset! error* (tr "onboarding.figma-import.error-bad-team"))
              (do
                (reset! error* nil)
@@ -251,7 +251,7 @@
          ;; Figma exposes no way to discover a person's teams, so the id has
          ;; to come from somewhere. When an admin has set it instance-wide,
          ;; nobody else should be asked.
-         (when (nil? (figma/configured-team-id))
+         (when (empty? (figma/configured-team-ids))
            [:div {:class (stl/css :field)}
             [:label {:class (stl/css :field-label)}
              (tr "onboarding.figma-import.team-label")]
@@ -285,10 +285,15 @@
                (tr "onboarding.figma-import.progress"))]
 
          [:div {:class (stl/css :file-groups)}
-          (for [{:keys [project files]} @groups*]
-            [:div {:key (str (:id project)) :class (stl/css :file-group)}
+          (for [{:keys [team project files error]} @groups*]
+            [:div {:key (str (:id team) "/" (:id project)) :class (stl/css :file-group)}
              [:> heading* {:level 2 :typography t/headline-small :class (stl/css :color-light)}
-              (:name project)]
+              (if (:name team)
+                (str (:name team) " / " (or (:name project) "—"))
+                (or (:name project) (str "Team " (:id team))))]
+             (when error
+               [:> text* {:as "div" :typography t/body-small :class (stl/css :error)}
+                (str (tr "onboarding.figma-import.team-unavailable") " " error)])
              (if (seq files)
                [:ul {:class (stl/css :file-list)}
                 (for [file files]
