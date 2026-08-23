@@ -45,6 +45,9 @@ volumes:
 services:
   penpot-frontend:
     image: "${IMAGE_PREFIX:-penpotapp/}frontend:${PENPOT_VERSION:-2.17}"
+    # Our images are built linux/amd64 for the home lab; this Mac is
+    # arm64, so they run here under Colima's Rosetta emulation.
+    platform: ${GRIDLINE_PLATFORM:-linux/amd64}
     restart: unless-stopped
     ports:
       - "${PENPOT_HTTP_PORT:-9101}:8080"
@@ -60,6 +63,9 @@ services:
 
   penpot-backend:
     image: "${IMAGE_PREFIX:-penpotapp/}backend:${PENPOT_VERSION:-2.17}"
+    # Our images are built linux/amd64 for the home lab; this Mac is
+    # arm64, so they run here under Colima's Rosetta emulation.
+    platform: ${GRIDLINE_PLATFORM:-linux/amd64}
     restart: unless-stopped
     volumes:
       - gridline_dev_assets:/opt/data/assets
@@ -88,6 +94,9 @@ services:
 
   penpot-exporter:
     image: "${IMAGE_PREFIX:-penpotapp/}exporter:${PENPOT_VERSION:-2.17}"
+    # Our images are built linux/amd64 for the home lab; this Mac is
+    # arm64, so they run here under Colima's Rosetta emulation.
+    platform: ${GRIDLINE_PLATFORM:-linux/amd64}
     restart: unless-stopped
     depends_on:
       penpot-valkey: {condition: service_healthy}
@@ -99,6 +108,9 @@ services:
 
   penpot-mcp:
     image: "${IMAGE_PREFIX:-penpotapp/}mcp:${PENPOT_VERSION:-2.17}"
+    # Our images are built linux/amd64 for the home lab; this Mac is
+    # arm64, so they run here under Colima's Rosetta emulation.
+    platform: ${GRIDLINE_PLATFORM:-linux/amd64}
     restart: unless-stopped
     networks: [gridline-dev]
 

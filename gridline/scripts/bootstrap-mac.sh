@@ -27,9 +27,11 @@ info "Free disk: ${avail_gb}GB"
 if (( avail_gb < 25 )); then
   warn "Penpot images + Postgres + the Colima VM want ~25GB free; you have ${avail_gb}GB."
   warn "Free up space before running the devenv build, or it will fail mid-way."
-  (( INSTALL )) && die "Refusing to install with <25GB free. Re-run after freeing space, or set FORCE=1."
+  if (( INSTALL )) && [[ "${FORCE:-0}" != "1" ]]; then
+    die "Refusing to install with <25GB free. Re-run after freeing space, or set FORCE=1."
+  fi
+  [[ "${FORCE:-0}" == "1" ]] && warn "FORCE=1 set, continuing anyway."
 fi
-[[ "${FORCE:-0}" == "1" ]] && warn "FORCE=1 set, ignoring disk guard."
 
 # --- tooling -----------------------------------------------------------------
 need_install=()
