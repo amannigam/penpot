@@ -122,8 +122,14 @@
 
 (def ^:const authorize-uri "https://www.figma.com/oauth")
 
-;; Read-only, and the narrowest scope that still lists files.
-(def ^:const scopes "files:read")
+;; Read-only, and the narrowest scope that lists what we need. Figma renamed
+;; projects to folders: `folders:read` is what covers both
+;; /v1/teams/:id/projects and /v1/projects/:id/files. `files:read` is the older
+;; catch-all and is not what these endpoints are documented against any more.
+;;
+;; This scope must also be ticked on the OAuth app itself -- requesting a scope
+;; the app does not declare is what produces "Invalid scopes for app".
+(def ^:const scopes "folders:read")
 
 (defn- base64url
   [^js buffer]
@@ -172,6 +178,15 @@
 (defn configured?
   []
   (not (str/blank? cf/figma-client-id)))
+
+(defn configured-team-id
+  "Figma has no endpoint that lists a user's teams, and no scope for it -- the
+  id can only be read out of a browser URL. That is a property of the
+  organisation, not of each person, so an admin sets it once via
+  PENPOT_FIGMA_TEAM_ID and nobody else is ever asked."
+  []
+  (let [v (str/trim (or cf/figma-team-id ""))]
+    (when-not (str/blank? v) (parse-team-id v))))
 
 ;; --- popup plumbing --------------------------------------------------------
 ;;

@@ -55,13 +55,51 @@ jobs:
         # The devenv image plus the CLJS/WASM build easily exceed the ~14GB a
         # stock runner leaves free. These preinstalled SDKs are dead weight here.
         run: |
-          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
-                      /usr/local/share/boost "$AGENT_TOOLSDIRECTORY" || true
+          # dotnet is the bulk of it; clearing the rest cost ~2 min for space
+          # the build never needed.
+          sudo rm -rf /usr/share/dotnet || true
           df -h /
 
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0   # manage.sh derives the version from `git describe`
+
+      # None of this was cached before, so every run re-resolved Maven deps,
+      # re-downloaded the pnpm store and recompiled CLJS from cold.
+      - name: Cache JVM and node dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.m2
+            ~/.gitlibs
+            ~/.cache/pnpm
+          key: deps-${{ runner.os }}-${{ hashFiles('deps.edn', 'backend/deps.edn', 'frontend/deps.edn', 'pnpm-lock.yaml') }}
+          restore-keys: |
+            deps-${{ runner.os }}-
+
+      # The shadow-cljs compile cache is the difference between a warm and a
+      # cold CLJS build. Keyed on the commit so it always saves, restoring from
+      # whatever the most recent build left behind.
+      - name: Cache the CLJS compiler output
+        uses: actions/cache@v4
+        with:
+          path: |
+            frontend/.shadow-cljs
+          key: cljs-${{ runner.os }}-${{ github.sha }}
+          restore-keys: |
+            cljs-${{ runner.os }}-
+
+      - name: Cache the compiled wasm engine
+        uses: actions/cache@v4
+        with:
+          path: |
+            render-wasm/target
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: wasm-${{ runner.os }}-${{ hashFiles('render-wasm/Cargo.lock') }}-${{ github.sha }}
+          restore-keys: |
+            wasm-${{ runner.os }}-${{ hashFiles('render-wasm/Cargo.lock') }}-
+            wasm-${{ runner.os }}-
 
       # Authenticated pulls avoid Docker Hub's anonymous rate limit. Non-fatal:
       # the bundle build still works unauthenticated, just rate-limited.
@@ -74,6 +112,9 @@ jobs:
 
       - name: Build bundles
         env:
+          # NOTE: this is currently inert -- nothing in the tree reads it;
+          # frontend/scripts/build always invokes render-wasm/build. The Rust
+          # cache above is what actually makes that step cheaper.
           BUILD_WASM: ${{ (inputs.build_wasm == false) && 'no' || 'yes' }}
           BUILD_STORYBOOK: 'no'   # not shipped in the gridline stack
         run: ./manage.sh build-bundle

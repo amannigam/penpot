@@ -70,6 +70,8 @@ services:
       # the client secret stays with the backend, which is the whole reason the
       # token exchange happens server-side.
       PENPOT_FIGMA_CLIENT_ID: ${PENPOT_FIGMA_CLIENT_ID}
+      # Set once by an admin: Figma cannot tell us anyone's teams.
+      PENPOT_FIGMA_TEAM_ID: ${PENPOT_FIGMA_TEAM_ID}
 
   penpot-backend:
     image: "${IMAGE_PREFIX}backend:${PENPOT_VERSION}"

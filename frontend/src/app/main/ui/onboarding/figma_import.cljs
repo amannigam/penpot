@@ -99,7 +99,7 @@
 
         phase*     (mf/use-state :intro)
         token*     (mf/use-state nil)   ;; obtained via OAuth; never persisted
-        team-ref*  (mf/use-state "")
+        team-ref*  (mf/use-state (or (figma/configured-team-id) ""))
         error*     (mf/use-state nil)
         loading*   (mf/use-state false)
         groups*    (mf/use-state nil)
@@ -244,17 +244,21 @@
          [:> text* {:as "div" :typography t/body-large :class (stl/css :color-dimmed)}
           (tr "onboarding.figma-import.connect-desc")]
 
-         [:div {:class (stl/css :field)}
-          [:label {:class (stl/css :field-label)}
-           (tr "onboarding.figma-import.team-label")]
-          [:input {:class (stl/css :field-input)
-                   :type "text"
-                   :auto-complete "off"
-                   :placeholder "https://www.figma.com/files/team/123456789/..."
-                   :value @team-ref*
-                   :on-change #(reset! team-ref* (dom/get-target-val %))}]
-          [:> text* {:as "div" :typography t/body-small :class (stl/css :color-dimmed)}
-           (tr "onboarding.figma-import.team-help")]]
+         ;; Figma exposes no way to discover a person's teams, so the id has
+         ;; to come from somewhere. When an admin has set it instance-wide,
+         ;; nobody else should be asked.
+         (when (nil? (figma/configured-team-id))
+           [:div {:class (stl/css :field)}
+            [:label {:class (stl/css :field-label)}
+             (tr "onboarding.figma-import.team-label")]
+            [:input {:class (stl/css :field-input)
+                     :type "text"
+                     :auto-complete "off"
+                     :placeholder "https://www.figma.com/files/team/123456789/..."
+                     :value @team-ref*
+                     :on-change #(reset! team-ref* (dom/get-target-val %))}]
+            [:> text* {:as "div" :typography t/body-small :class (stl/css :color-dimmed)}
+             (tr "onboarding.figma-import.team-help")]])
 
          (when-let [error @error*]
            [:> text* {:as "div" :typography t/body-small :class (stl/css :error)}

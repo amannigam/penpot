@@ -54,7 +54,16 @@ update_figma_client_id() {
 
 update_flags /var/www/app/js/config.js
 update_oidc_name /var/www/app/js/config.js
+update_figma_team_id() {
+  if [ -n "$PENPOT_FIGMA_TEAM_ID" ]; then
+    echo "$(sed \
+      -e "s|^//var penpotFigmaTeamId = .*;|var penpotFigmaTeamId = \"$PENPOT_FIGMA_TEAM_ID\";|g" \
+      "$1")" > "$1"
+  fi
+}
+
 update_figma_client_id /var/www/app/js/config.js
+update_figma_team_id /var/www/app/js/config.js
 
 #########################################
 ## Nginx Config
