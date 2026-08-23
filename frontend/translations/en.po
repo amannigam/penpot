@@ -4774,6 +4774,51 @@ msgstr "Start without a team"
 msgid "onboarding.choice.team-up.start-without-a-team-description"
 msgstr "You will be able to create a team later."
 
+#: src/app/main/ui/onboarding/figma_import.cljs
+msgid "onboarding.figma-import.caveat"
+msgstr ""
+"Big files can take a while, and prototyping interactions don't come across. "
+"Everything else does."
+
+#: src/app/main/ui/onboarding/figma_import.cljs
+msgid "onboarding.figma-import.choose-files"
+msgstr "Select .zip files"
+
+#: src/app/main/ui/onboarding/figma_import.cljs
+msgid "onboarding.figma-import.later"
+msgstr ""
+"You can do this later from the Drafts menu: Import Penpot files."
+
+#: src/app/main/ui/onboarding/figma_import.cljs
+msgid "onboarding.figma-import.plugin-name"
+msgstr "Penpot Exporter"
+
+#: src/app/main/ui/onboarding/figma_import.cljs
+msgid "onboarding.figma-import.skip"
+msgstr "Skip for now"
+
+#: src/app/main/ui/onboarding/figma_import.cljs
+msgid "onboarding.figma-import.step-1"
+msgstr "In Figma, open Resources > Plugins and run"
+
+#: src/app/main/ui/onboarding/figma_import.cljs
+msgid "onboarding.figma-import.step-2"
+msgstr "Run it on each Figma file you want to bring over. Each one gives you a .zip."
+
+#: src/app/main/ui/onboarding/figma_import.cljs
+msgid "onboarding.figma-import.step-3"
+msgstr "Come back here and select those .zip files. You can pick several at once."
+
+#: src/app/main/ui/onboarding/figma_import.cljs
+msgid "onboarding.figma-import.subtitle"
+msgstr ""
+"Figma has no bulk export, so this takes a plugin and a few clicks per file. "
+"Here is the whole of it."
+
+#: src/app/main/ui/onboarding/figma_import.cljs
+msgid "onboarding.figma-import.title"
+msgstr "Bring your Figma files across"
+
 #, unused
 msgid "onboarding.newsletter.accept"
 msgstr "Yes, subscribe"

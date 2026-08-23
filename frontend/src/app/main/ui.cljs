@@ -26,6 +26,7 @@
    [app.main.ui.frame-preview :as frame-preview]
    [app.main.ui.nitrate.entry :as nitrate-entry]
    [app.main.ui.notifications :as notifications]
+   [app.main.ui.onboarding.figma-import :refer [figma-import-modal*]]
    [app.main.ui.onboarding.questions :refer [questions-modal]]
    [app.main.ui.onboarding.team-choice :refer [onboarding-team-modal*]]
    [app.main.ui.releases :refer [release-notes-modal]]
@@ -162,6 +163,10 @@
 
         show-question-modal?
         (and (contains? cf/flags :onboarding)
+             ;; Penpotter: the "what do you use it for / how big is your team"
+             ;; survey earns nothing on an internal instance. Turn it off with
+             ;; disable-onboarding-questions.
+             (contains? cf/flags :onboarding-questions)
              (not nitrate-entry-active?)
              (not (:onboarding-viewed props))
              (not (contains? props :onboarding-questions)))
@@ -172,6 +177,15 @@
              (not (:onboarding-viewed props))
              (not (contains? props :onboarding-team-id))
              (:is-default team))
+
+        ;; Penpotter: offered once, after the team exists, before the empty
+        ;; dashboard. Skippable and repeatable from the Drafts menu later.
+        show-figma-import-modal?
+        (and (contains? cf/flags :penpotter-figma-onboarding)
+             (not nitrate-entry-active?)
+             (not (:penpotter-figma-import-viewed props))
+             (or (:onboarding-viewed props)
+                 (contains? props :onboarding-team-id)))
 
         show-release-modal?
         (and (contains? cf/flags :onboarding)
@@ -249,6 +263,9 @@
 
             show-team-modal?
             [:> onboarding-team-modal* {:go-to-team true}]
+
+            show-figma-import-modal?
+            [:> figma-import-modal*]
 
             show-release-modal?
             [:& release-notes-modal {:version (:main cf/version)}])

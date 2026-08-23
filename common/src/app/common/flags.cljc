@@ -109,6 +109,12 @@
     :prepl-server
     ;; Shows the onboarding modals right after registration.
     :onboarding
+    ;; The "what do you use Penpot for / how big is your team" survey shown
+    ;; before team creation. Disable it to go straight to the useful steps.
+    :onboarding-questions
+    ;; Penpotter: offer to bring Figma files across during onboarding, via the
+    ;; Penpot Exporter Figma plugin. Off by default; this is a fork feature.
+    :penpotter-figma-onboarding
     :quotes
     :soft-quotes
     ;; Concurrency limit.
@@ -189,6 +195,7 @@
    :enable-secure-session-cookies
    :enable-email-verification
    :enable-onboarding
+   :enable-onboarding-questions
    :enable-dashboard-templates-section
    :enable-google-fonts-provider
    :enable-component-thumbnails

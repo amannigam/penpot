@@ -1,0 +1,84 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at http://mozilla.org/MPL/2.0/.
+//
+// Copyright (c) KALEIDOS INC Sucursal en España SL
+
+@use "refactor/common-refactor.scss" as deprecated;
+@use "ds/typography.scss" as t;
+@use "ds/_borders.scss" as *;
+@use "ds/_sizes.scss" as *;
+@use "ds/_utils.scss" as *;
+
+.color-light {
+  color: var(--color-foreground-primary);
+}
+
+.color-dimmed {
+  color: var(--color-foreground-secondary);
+}
+
+.modal-overlay {
+  @extend %modal-overlay-base;
+}
+
+.modal-container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-l);
+  position: relative;
+  inline-size: px2rem(640);
+  padding: px2rem(56) px2rem(64);
+  border-radius: $br-8;
+  background-color: var(--color-background-primary);
+  border: $b-2 solid var(--color-background-quaternary);
+}
+
+.steps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-m);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.step {
+  display: grid;
+  grid-template-columns: $sz-24 1fr;
+  align-items: start;
+  gap: var(--sp-m);
+}
+
+.step-index {
+  @include t.use-typography("body-small");
+
+  display: grid;
+  place-items: center;
+  inline-size: $sz-24;
+  block-size: $sz-24;
+  border-radius: $br-circle;
+  background-color: var(--color-background-quaternary);
+  color: var(--color-foreground-primary);
+}
+
+.actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-m);
+  margin-block-start: var(--sp-s);
+}
+
+.link {
+  @include t.use-typography("body-small");
+
+  cursor: pointer;
+  text-decoration: underline;
+  text-align: center;
+  color: var(--color-foreground-secondary);
+
+  &:hover {
+    color: var(--color-foreground-primary);
+  }
+}
