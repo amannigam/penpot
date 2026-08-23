@@ -23,7 +23,7 @@
    [beicon.v2.core :as rx]
    [cuerdas.core :as str]))
 
-(def ^:const base-uri "https://api.figma.com/v1")
+(def ^:const base-uri "https://api.figma.com")
 
 (defn parse-team-id
   "Accepts a bare team id or a pasted Figma team URL.
@@ -71,32 +71,38 @@
                          :status status
                          :message (error-message status body)})))))))
 
-(defn list-projects
-  "GET /v1/teams/:team-id/projects -> {:name .. :projects [{:id :name} ...]}"
+(defn list-folders
+  "GET /v2/teams/:team-id/folders -> {:name .. :folders [{:id :name} ...]}
+
+  Figma renamed projects to folders. The v1 equivalent still exists but
+  requires projects:read, which cannot be granted to a new OAuth app any more,
+  so v2 is the only route that works."
   [token team-id]
-  (request token (str "/teams/" team-id "/projects")))
+  (request token (str "/v2/teams/" team-id "/folders")))
 
-(defn list-project-files
-  "GET /v1/projects/:project-id/files -> {:name .. :files [{:key :name ...}]}
+(defn list-folder-files
+  "GET /v2/folders/:folder-id/files -> {:name .. :files [{:key :name ...}]}
 
-  Note this only covers files inside team projects. Drafts do not belong to a
-  project, so they will not appear here."
-  [token project-id]
-  (request token (str "/projects/" project-id "/files")))
+  Only covers files inside team folders. Drafts do not live in a folder, so
+  they never appear here."
+  [token folder-id]
+  (request token (str "/v2/folders/" folder-id "/files")))
 
 (defn list-team-files
-  "Every project in a team, each with its files.
+  "Every folder in a team, each with its files.
 
-  Emits once, with [{:project {:id :name} :files [...]} ...]."
+  Emits once, with [{:project {:id :name} :files [...]} ...]. The key stays
+  :project because that is the word the UI shows and the word Figma's own
+  interface still uses."
   [token team-id]
-  (->> (list-projects token team-id)
-       (rx/mapcat (fn [{:keys [projects]}]
-                    (if (seq projects)
-                      (->> (rx/from projects)
-                           (rx/mapcat (fn [project]
-                                        (->> (list-project-files token (:id project))
+  (->> (list-folders token team-id)
+       (rx/mapcat (fn [{:keys [folders]}]
+                    (if (seq folders)
+                      (->> (rx/from folders)
+                           (rx/mapcat (fn [folder]
+                                        (->> (list-folder-files token (:id folder))
                                              (rx/map (fn [{:keys [files]}]
-                                                       {:project project
+                                                       {:project folder
                                                         :files (vec files)}))))))
                       (rx/of nil))))
        (rx/filter some?)
@@ -126,13 +132,11 @@
 
 (def ^:const authorize-uri "https://www.figma.com/oauth")
 
-;; Read-only, and the narrowest scope that lists what we need. Figma renamed
-;; projects to folders: `folders:read` is what covers both
-;; /v1/teams/:id/projects and /v1/projects/:id/files. `files:read` is the older
-;; catch-all and is not what these endpoints are documented against any more.
-;;
-;; This scope must also be ticked on the OAuth app itself -- requesting a scope
-;; the app does not declare is what produces "Invalid scopes for app".
+;; Read-only, and the narrowest set that works. Verified against the live API,
+;; because the docs are misleading here: they present folders:read as the
+;; successor to projects:read, but the v1 endpoints still demand projects:read
+;; -- a scope Figma no longer offers when configuring an app. The v2 endpoints
+;; are the ones that actually accept folders:read, so those are what we call.
 (def ^:const scopes "folders:read")
 
 (defn- base64url
