@@ -92,8 +92,8 @@
 (def ^:private arrow-up-right-icon
   (deprecated-icon/icon-xref :arrow-up-right (stl/css :arrow-up-right-icon)))
 
-(def ^:private ^:svg-id penpot-logo-icon "penpot-logo-icon")
-(def ^:private ^:svg-id penpot-logo-icon-subtle "penpot-logo-subtle")
+(def ^:private ^:svg-id gridline-logo-icon "gridline-logo-icon")
+(def ^:private ^:svg-id gridline-logo-icon-subtle "gridline-logo-subtle")
 
 (defn schedule-focus-by-id!
   [ref element-id]
@@ -345,7 +345,7 @@
                               :data-value  default-team-id
                               :class       (stl/css :org-dropdown-item)}
       [:span {:class (stl/css :my-teams-icon)}
-       [:> raw-svg* {:id penpot-logo-icon-subtle}]]
+       [:> raw-svg* {:id gridline-logo-icon-subtle}]]
       [:span {:class (stl/css :team-text)
               :title (tr "dashboard.my-teams")}
        (tr "dashboard.my-teams")]
@@ -758,7 +758,7 @@
           (if default-org?
             [:*
              [:span {:class (stl/css :my-teams-icon-xxxl)}
-              [:> raw-svg* {:id penpot-logo-icon-subtle}]]
+              [:> raw-svg* {:id gridline-logo-icon-subtle}]]
              [:span {:class (stl/css :team-text)}
               (tr "dashboard.my-teams")]]
             [:*
@@ -792,8 +792,8 @@
                                   :teams org-teams}]]
       [:div {:class (stl/css :selected-org)}
        [:span {:class (stl/css :org-penpot-icon)}
-        [:> raw-svg* {:id penpot-logo-icon}]]
-       "Penpot"
+        [:> raw-svg* {:id gridline-logo-icon}]]
+       "Gridline"
        [:> button* {:variant "ghost"
                     :type "button"
                     :class (stl/css :create-org)

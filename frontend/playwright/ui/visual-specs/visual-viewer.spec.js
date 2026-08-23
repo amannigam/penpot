@@ -15,7 +15,7 @@ test("User goes to an empty Viewer", async ({ page }) => {
 
   await viewerPage.goToViewer();
 
-  await expect(viewerPage.page.getByTestId("penpot-logo-link")).toBeVisible();
+  await expect(viewerPage.page.getByTestId("gridline-logo-link")).toBeVisible();
   await expect(viewerPage.page).toHaveScreenshot();
 });
 
@@ -29,7 +29,7 @@ test("User goes to the Viewer", async ({ page }) => {
     pageId: singleBoardPageId,
   });
 
-  await expect(viewerPage.page.getByTestId("penpot-logo-link")).toBeVisible();
+  await expect(viewerPage.page.getByTestId("gridline-logo-link")).toBeVisible();
   await expect(viewerPage.page).toHaveScreenshot();
 });
 
@@ -45,7 +45,7 @@ test("User goes to the Viewer and opens zoom modal", async ({ page }) => {
 
   await viewerPage.page.getByTitle("Zoom").click();
 
-  await expect(viewerPage.page.getByTestId("penpot-logo-link")).toBeVisible();
+  await expect(viewerPage.page.getByTestId("gridline-logo-link")).toBeVisible();
   await expect(viewerPage.page).toHaveScreenshot();
 });
 

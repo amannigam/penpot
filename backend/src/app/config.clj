@@ -197,7 +197,7 @@
     [:registration-domain-whitelist {:optional true} [::sm/set :string]]
     [:email-verify-threshold {:optional true} ::ct/duration]
 
-    ;; Penpotter: OAuth app used to list a person's Figma files during
+    ;; Gridline: OAuth app used to list a person's Figma files during
     ;; onboarding. The secret is only ever used server-side, for the
     ;; token exchange Figma requires it for.
     [:figma-client-id {:optional true} :string]

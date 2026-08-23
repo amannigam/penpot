@@ -5,13 +5,13 @@
 ;; Copyright (c) KALEIDOS INC Sucursal en España SL
 
 (ns app.main.ui.onboarding.figma-import
-  "Penpotter: the onboarding step that brings Figma files across.
+  "Gridline: the onboarding step that brings Figma files across.
 
   Two halves, because Figma splits them:
 
   - Discovery is ours. We call Figma's REST API from the browser to list every
     file in a team, so people pick from a checklist instead of remembering what
-    they have. See app.main.data.penpotter.figma for why this needs no proxy.
+    they have. See app.main.data.gridline.figma for why this needs no proxy.
 
   - Conversion is the Penpot Exporter plugin's. Its transformers are written
     against Figma's plugin API -- live nodes, image.getBytesAsync -- which REST
@@ -21,7 +21,7 @@
   (:require-macros [app.main.style :as stl])
   (:require
    [app.main.data.event :as ev]
-   [app.main.data.penpotter.figma :as figma]
+   [app.main.data.gridline.figma :as figma]
    [app.main.data.profile :as du]
    [app.main.refs :as refs]
    [app.main.store :as st]
@@ -46,7 +46,7 @@
 
 (defn- finish!
   [label]
-  (st/emit! (du/update-profile-props {:penpotter-figma-import-viewed true})
+  (st/emit! (du/update-profile-props {:gridline-figma-import-viewed true})
             (ev/event {::ev/name "onboarding-step"
                        :label (str "figma-import:" label)})))
 

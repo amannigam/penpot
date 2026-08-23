@@ -261,8 +261,8 @@
        [:span {:class (stl/css :frame-name)} frame-name]
        [:span {:class (stl/css :icon)} deprecated-icon/arrow]]]]))
 
-(def ^:private penpot-logo-icon
-  (deprecated-icon/icon-xref :penpot-logo-icon (stl/css :logo-icon)))
+(def ^:private gridline-logo-icon
+  (deprecated-icon/icon-xref :gridline-logo-icon (stl/css :logo-icon)))
 
 
 (mf/defc header
@@ -312,10 +312,10 @@
       ;; If the user doesn't have permission we disable the link
       [:a {:class (stl/css :home-link)
            :on-click go-to-dashboard
-           :data-testid "penpot-logo-link"
+           :data-testid "gridline-logo-link"
            :style {:cursor (when-not (:in-team permissions) "auto")
                    :pointer-events (when-not (:in-team permissions) "none")}}
-       penpot-logo-icon]
+       gridline-logo-icon]
 
       [:& header-sitemap {:project project
                           :file file

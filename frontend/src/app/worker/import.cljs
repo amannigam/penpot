@@ -52,7 +52,7 @@
                     (if (nil? entry)
                       (rx/throw (ex/error :type :validation
                                           :code :invalid-penpot-file
-                                          :hint "Not a valid Penpot file: manifest.json is missing"))
+                                          :hint "Not a valid Gridline file: manifest.json is missing"))
                       (uz/read-as-text entry))))
        (rx/map json/decode)))
 

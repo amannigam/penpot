@@ -163,7 +163,7 @@
 
         show-question-modal?
         (and (contains? cf/flags :onboarding)
-             ;; Penpotter: the "what do you use it for / how big is your team"
+             ;; Gridline: the "what do you use it for / how big is your team"
              ;; survey earns nothing on an internal instance. Turn it off with
              ;; disable-onboarding-questions.
              (contains? cf/flags :onboarding-questions)
@@ -178,12 +178,12 @@
              (not (contains? props :onboarding-team-id))
              (:is-default team))
 
-        ;; Penpotter: offered once, after the team exists, before the empty
+        ;; Gridline: offered once, after the team exists, before the empty
         ;; dashboard. Skippable and repeatable from the Drafts menu later.
         show-figma-import-modal?
-        (and (contains? cf/flags :penpotter-figma-onboarding)
+        (and (contains? cf/flags :gridline-figma-onboarding)
              (not nitrate-entry-active?)
-             (not (:penpotter-figma-import-viewed props))
+             (not (:gridline-figma-import-viewed props))
              (or (:onboarding-viewed props)
                  (contains? props :onboarding-team-id)))
 

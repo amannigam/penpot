@@ -27,7 +27,7 @@ msgstr "Check your email"
 #: src/app/main/ui/auth/register.cljs:277
 #, unused
 msgid "auth.check-your-email"
-msgstr "Check your email and click on the link to verify and start using Penpot."
+msgstr "Check your email and click on the link to verify and start using Gridline."
 
 #: src/app/main/ui/auth/recovery.cljs:67
 msgid "auth.confirm-password"
@@ -71,7 +71,7 @@ msgstr "Login"
 
 #: src/app/main/ui/auth/login.cljs:273
 msgid "auth.login-tagline"
-msgstr "Penpot is the free open-source design tool for Design and Code collaboration"
+msgstr "Gridline is the free open-source design tool for Design and Code collaboration"
 
 #: src/app/main/ui/auth/login.cljs:230
 msgid "auth.login-with-github-submit"
@@ -165,7 +165,7 @@ msgstr "Create an account"
 #, unused
 msgid "auth.register-tagline"
 msgstr ""
-"With a free Penpot account, you can create unlimited teams and collaborate "
+"With a free Gridline account, you can create unlimited teams and collaborate "
 "with other designers and developers on as many projects as you like. "
 
 #: src/app/main/ui/auth/register.cljs:205
@@ -176,7 +176,7 @@ msgstr "Create an account"
 #, unused
 msgid "auth.sidebar-tagline"
 msgstr ""
-"Penpot is the open-source design platform for teams that build digital "
+"Gridline is the open-source design platform for teams that build digital "
 "products at scale."
 
 #: src/app/main/ui/auth/register.cljs:50
@@ -226,7 +226,7 @@ msgstr "Publish"
 
 #: src/app/main/ui/viewer/share_link.cljs:305, src/app/main/ui/viewer/share_link.cljs:315
 msgid "common.share-link.all-users"
-msgstr "All Penpot users"
+msgstr "All Gridline users"
 
 #: src/app/main/ui/viewer/share_link.cljs:199
 msgid "common.share-link.confirm-deletion-link-description"
@@ -307,7 +307,7 @@ msgstr "Team management"
 #: src/app/main/ui/dashboard/projects.cljs:89
 msgid "dasboard.team-hero.text"
 msgstr ""
-"Penpot is meant for teams. Invite members to work together on projects and "
+"Gridline is meant for teams. Invite members to work together on projects and "
 "files"
 
 #: src/app/main/ui/dashboard/projects.cljs:87
@@ -318,7 +318,7 @@ msgstr "Team up!"
 #, unused
 msgid "dasboard.tutorial-hero.info"
 msgstr ""
-"Learn the basics at Penpot while having some fun with this hands on "
+"Learn the basics at Gridline while having some fun with this hands on "
 "tutorial."
 
 #: src/app/main/ui/dashboard/projects.cljs
@@ -334,7 +334,7 @@ msgstr "Hands on Tutorial"
 #: src/app/main/ui/dashboard/projects.cljs
 #, unused
 msgid "dasboard.walkthrough-hero.info"
-msgstr "Take a walk through Penpot and get to know its main features."
+msgstr "Take a walk through Gridline and get to know its main features."
 
 #: src/app/main/ui/dashboard/projects.cljs
 #, unused
@@ -410,7 +410,7 @@ msgstr "Pin this version"
 
 #: src/app/main/ui/components/context_menu_a11y.cljs:300, src/app/main/ui/dashboard/sidebar.cljs:882
 msgid "dashboard.default-team-name"
-msgstr "Your Penpot"
+msgstr "Your Gridline"
 
 #: src/app/main/ui/dashboard/deleted.cljs:265
 msgid "dashboard.delete-all-forever-confirmation.description"
@@ -459,7 +459,7 @@ msgstr "Will be deleted %s"
 
 #: src/app/main/ui/dashboard/file_menu.cljs:329, src/app/main/ui/workspace/main_menu.cljs:732
 msgid "dashboard.download-binary-file"
-msgstr "Download Penpot file (.penpot)"
+msgstr "Download Gridline file (.penpot)"
 
 #: src/app/main/ui/dashboard/file_menu.cljs:321, src/app/main/ui/workspace/main_menu.cljs:712
 #, unused
@@ -568,7 +568,7 @@ msgstr "There was an error while restoring the project %s and its files."
 
 #: src/app/main/ui/dashboard/file_menu.cljs:281
 msgid "dashboard.export-binary-multi"
-msgstr "Download %s Penpot files (.penpot)"
+msgstr "Download %s Gridline files (.penpot)"
 
 #: src/app/main/ui/workspace/main_menu.cljs:740
 msgid "dashboard.export-frames"
@@ -580,7 +580,7 @@ msgstr "Export as PDF"
 
 #, unused
 msgid "dashboard.export-multi"
-msgstr "Export Penpot %s files"
+msgstr "Export Gridline %s files"
 
 #: src/app/main/ui/exports/assets.cljs:108
 msgid "dashboard.export-multiple.selected"
@@ -598,7 +598,7 @@ msgstr ""
 
 #: src/app/main/ui/exports/assets.cljs:183
 msgid "dashboard.export-shapes.how-to-link"
-msgstr "Info how to set exports at Penpot."
+msgstr "Info how to set exports at Gridline."
 
 #: src/app/main/ui/exports/assets.cljs:178
 msgid "dashboard.export-shapes.no-elements"
@@ -665,8 +665,8 @@ msgstr ""
 #, markdown
 msgid "dashboard.fonts.hero-text2"
 msgstr ""
-"You should only upload fonts you own or have license to use in Penpot. Find "
-"out more in the Content rights section of [Penpot's Terms of Service](%s). "
+"You should only upload fonts you own or have license to use in Gridline. Find "
+"out more in the Content rights section of [Gridline's Terms of Service](%s). "
 "You also might want to read about [font "
 "licensing](https://www.typography.com/faq)."
 
@@ -691,7 +691,7 @@ msgstr "Go to Admin Console"
 
 #: src/app/main/ui/dashboard/import.cljs:463, src/app/main/ui/dashboard/project_menu.cljs:109
 msgid "dashboard.import"
-msgstr "Import Penpot files"
+msgstr "Import Gridline files"
 
 #: src/app/main/ui/dashboard/import.cljs:290, src/app/worker/import.cljs:138, src/app/worker/import.cljs:141
 msgid "dashboard.import.analyze-error"
@@ -1120,11 +1120,11 @@ msgstr "Select theme"
 
 #: src/app/main/ui/settings/options.cljs:76
 msgid "dashboard.select-ui-theme.dark"
-msgstr "Penpot Dark (default)"
+msgstr "Gridline Dark (default)"
 
 #: src/app/main/ui/settings/options.cljs:77
 msgid "dashboard.select-ui-theme.light"
-msgstr "Penpot Light"
+msgstr "Gridline Light"
 
 #: src/app/main/ui/settings/options.cljs:78
 msgid "dashboard.select-ui-theme.system"
@@ -1326,7 +1326,7 @@ msgstr "No limits on creativity"
 
 #: src/app/main/ui/dashboard/sidebar.cljs:1326
 msgid "dashboard.upgrade-plan.penpot-free"
-msgstr "Penpot Free"
+msgstr "Gridline Free"
 
 #, unused
 msgid "dashboard.user-no-longer-belong-org"
@@ -1391,7 +1391,7 @@ msgstr "Webhook created successfully."
 msgid "dashboard.webhooks.description"
 msgstr ""
 "Webhooks are a simple way to allow other websites and apps to be notified "
-"when certain events happen at Penpot. We’ll send a POST request to each of "
+"when certain events happen at Gridline. We’ll send a POST request to each of "
 "the URLs you provide."
 
 #: src/app/main/ui/dashboard/team.cljs:1485
@@ -1420,7 +1420,7 @@ msgstr "Your name"
 
 #: src/app/main/ui/dashboard/file_menu.cljs:40, src/app/main/ui/dashboard/fonts.cljs:46, src/app/main/ui/dashboard/libraries.cljs:55, src/app/main/ui/dashboard/projects.cljs:352, src/app/main/ui/dashboard/search.cljs:47, src/app/main/ui/dashboard/sidebar.cljs:411, src/app/main/ui/dashboard/team.cljs:616, src/app/main/ui/dashboard/team.cljs:1191, src/app/main/ui/dashboard/team.cljs:1471, src/app/main/ui/dashboard/team.cljs:1577
 msgid "dashboard.your-penpot"
-msgstr "Your Penpot"
+msgstr "Your Gridline"
 
 #: src/app/main/ui/alert.cljs:36
 msgid "ds.alert-ok"
@@ -1500,7 +1500,7 @@ msgstr "Character limit exceeded"
 #: src/app/main/data/workspace/clipboard.cljs:327, src/app/main/data/workspace/clipboard.cljs:535
 msgid "errors.clipboard-api-unavailable"
 msgstr ""
-"Clipboard API is unavailable. Serve Penpot over HTTPS to enable clipboard "
+"Clipboard API is unavailable. Serve Gridline over HTTPS to enable clipboard "
 "access"
 
 #: src/app/main/data/workspace/clipboard.cljs:541
@@ -1520,7 +1520,7 @@ msgstr "There was an error with the comment"
 #: src/app/main/errors.cljs:414
 msgid "errors.deprecated"
 msgstr ""
-"Sorry! This is an old file that uses a deprecated type of Penpot assets and "
+"Sorry! This is an old file that uses a deprecated type of Gridline assets and "
 "you can't open it."
 
 #: src/app/main/errors.cljs:417
@@ -1529,7 +1529,7 @@ msgstr "so we can help you."
 
 #: src/app/main/errors.cljs:415
 msgid "errors.deprecated.contact.before"
-msgstr "Although Penpot no longer support this type of Assets, you can"
+msgstr "Although Gridline no longer support this type of Assets, you can"
 
 #: src/app/main/errors.cljs:416
 msgid "errors.deprecated.contact.text"
@@ -2015,7 +2015,7 @@ msgstr ""
 
 #: src/app/main/ui/settings/feedback.cljs:149
 msgid "feedback.discourse-title"
-msgstr "Penpot community"
+msgstr "Gridline community"
 
 #: src/app/main/ui/settings/feedback.cljs:143
 msgid "feedback.other-ways-contact"
@@ -2335,7 +2335,7 @@ msgstr "Select color space"
 
 #: src/app/main/ui/inspect/right_sidebar.cljs:235
 msgid "inspect.empty.help"
-msgstr "If you want to know more about design inspect visit Penpot's help center"
+msgstr "If you want to know more about design inspect visit Gridline's help center"
 
 #: src/app/main/ui/inspect/right_sidebar.cljs:239
 msgid "inspect.empty.more"
@@ -2469,7 +2469,7 @@ msgid "integrations.access-tokens.personal.description"
 msgstr ""
 "Personal access tokens function like an alternative to our login/password "
 "authentication system and can be used to allow an application to access the "
-"internal Penpot API"
+"internal Gridline API"
 
 #: src/app/main/ui/settings/integrations.cljs:68
 msgid "integrations.copy-to-clipboard"
@@ -2542,7 +2542,7 @@ msgstr "Add this configuration to your MCP client (e.g. ~/​​​​​​.mcp
 #: src/app/main/ui/settings/integrations.cljs:206
 msgid "integrations.info.mcp-server"
 msgstr ""
-"The Penpot MCP Server enables MCP clients to interact directly with Penpot "
+"The Gridline MCP Server enables MCP clients to interact directly with Gridline "
 "design files."
 
 #: src/app/main/ui/settings/integrations.cljs:113
@@ -2556,7 +2556,7 @@ msgstr "The MCP key has no expiration date"
 #: src/app/main/ui/settings/integrations.cljs:511
 msgid "integrations.mcp-server.description"
 msgstr ""
-"The Penpot MCP Server enables MCP clients to interact directly with Penpot "
+"The Gridline MCP Server enables MCP clients to interact directly with Gridline "
 "design files."
 
 #: src/app/main/ui/settings/integrations.cljs:415
@@ -2572,7 +2572,7 @@ msgstr "How to configure MCP clients"
 msgid "integrations.mcp-server.mcp-keys.info"
 msgstr ""
 "This is the server url you'll need to configure your MCP client in order to "
-"connect it to the Penpot MCP server."
+"connect it to the Gridline MCP server."
 
 #: src/app/main/ui/settings/integrations.cljs:561
 msgid "integrations.mcp-server.mcp-keys.regenerate"
@@ -2696,7 +2696,7 @@ msgstr "Shortcuts"
 
 #: src/app/main/ui/dashboard/sidebar.cljs:1395
 msgid "labels.about-penpot"
-msgstr "About Penpot"
+msgstr "About Gridline"
 
 #: src/app/main/data/common.cljs:90, src/app/main/data/team.cljs:163, src/app/main/data/team.cljs:584, src/app/main/ui/dashboard/import.cljs:556
 msgid "labels.accept"
@@ -2832,7 +2832,7 @@ msgstr "Continue with"
 
 #: src/app/main/ui/viewer/login.cljs:69
 msgid "labels.continue-with-penpot"
-msgstr "You can continue with a Penpot account"
+msgstr "You can continue with a Gridline account"
 
 #: src/app/main/ui/components/copy_button.cljs:41
 msgid "labels.copy"
@@ -3166,7 +3166,7 @@ msgstr "Next"
 #: src/app/main/ui/static.cljs:337
 msgid "labels.nitrate-unavailable.main-message"
 msgstr ""
-"Penpot is temporarily unavailable due to a system issue. Please try again "
+"Gridline is temporarily unavailable due to a system issue. Please try again "
 "shortly."
 
 #: src/app/main/ui/dashboard/comments.cljs:120, src/app/main/ui/workspace/comments.cljs:162
@@ -3267,7 +3267,7 @@ msgstr "Penpot Changelog"
 
 #: src/app/main/ui/dashboard/sidebar.cljs:1143
 msgid "labels.penpot-hub"
-msgstr "Penpot hub"
+msgstr "Gridline hub"
 
 #: src/app/main/ui/dashboard/sidebar.cljs:1091
 msgid "labels.pinned-projects"
@@ -3650,7 +3650,7 @@ msgstr "Interactive Prototypes"
 
 #: src/app/main/ui/ds/product/loader.cljs:33
 msgid "loader.tips.07.message"
-msgstr "Penpot uses SVG and CSS for seamless development."
+msgstr "Gridline uses SVG and CSS for seamless development."
 
 #: src/app/main/ui/ds/product/loader.cljs:32
 msgid "loader.tips.07.title"
@@ -3674,7 +3674,7 @@ msgstr "Dark & Light Mode"
 
 #: src/app/main/ui/ds/product/loader.cljs:39
 msgid "loader.tips.10.message"
-msgstr "Extend Penpot with community-built plugins for extra functionality."
+msgstr "Extend Gridline with community-built plugins for extra functionality."
 
 #: src/app/main/ui/ds/product/loader.cljs:38
 msgid "loader.tips.10.title"
@@ -4488,7 +4488,7 @@ msgstr "404 error"
 #: src/app/main/ui/static.cljs:160
 msgid "not-found.login.free"
 msgstr ""
-"Penpot is the free and open-source design tool for collaboration between "
+"Gridline is the free and open-source design tool for collaboration between "
 "Design and Code"
 
 #: src/app/main/ui/auth/recovery_request.cljs:114
@@ -4505,7 +4505,7 @@ msgstr "Sign up for free"
 
 #: src/app/main/ui/static.cljs:175
 msgid "not-found.login.start-using"
-msgstr "And start using Penpot in seconds!"
+msgstr "And start using Gridline in seconds!"
 
 #: src/app/main/ui/static.cljs:75
 msgid "not-found.made-with-love"
@@ -4551,7 +4551,7 @@ msgstr "You don't have access to this file."
 
 #: src/app/main/ui/static.cljs:62, src/app/main/ui/static.cljs:265, src/app/main/ui/static.cljs:271, src/app/main/ui/static.cljs:277, src/app/main/ui/static.cljs:283, src/app/main/ui/static.cljs:292, src/app/main/ui/static.cljs:301
 msgid "not-found.no-permission.go-dashboard"
-msgstr "Go to your Penpot"
+msgstr "Go to your Gridline"
 
 #: src/app/main/ui/static.cljs:289, src/app/main/ui/static.cljs:298
 msgid "not-found.no-permission.if-approves"
@@ -4559,7 +4559,7 @@ msgstr "If the owner allows it, you're going to be invited to the team."
 
 #: src/app/main/ui/static.cljs:527, src/app/main/ui/static.cljs:540
 msgid "not-found.no-permission.penpot-file"
-msgstr "Penpot file"
+msgstr "Gridline file"
 
 #: src/app/main/ui/static.cljs:264, src/app/main/ui/static.cljs:296
 msgid "not-found.no-permission.project"
@@ -4622,12 +4622,12 @@ msgstr "Verification email sent to %s. Check your email!"
 msgid "onboarding-v2.before-start.desc1"
 msgstr ""
 "You should know that there are lots of resources available to help you get "
-"started with Penpot, like the User Guide and our Youtube channel."
+"started with Gridline, like the User Guide and our Youtube channel."
 
 #, unused
 msgid "onboarding-v2.before-start.desc2"
 msgstr ""
-"Detailed info about how to use Penpot. From prototyping to organizing or "
+"Detailed info about how to use Gridline. From prototyping to organizing or "
 "sharing designs."
 
 #, unused
@@ -4650,13 +4650,13 @@ msgstr "Before you start"
 #, unused
 msgid "onboarding-v2.newsletter.desc"
 msgstr ""
-"Subscribe to the Penpot newsletter to stay up to date with the product "
+"Subscribe to the Gridline newsletter to stay up to date with the product "
 "development progress and news."
 
 #: src/app/main/ui/onboarding/newsletter.cljs:88
 #, unused
 msgid "onboarding-v2.newsletter.news"
-msgstr "Send me news about Penpot (blog posts, video tutorials, streamings...)."
+msgstr "Send me news about Gridline (blog posts, video tutorials, streamings...)."
 
 #: src/app/main/ui/onboarding/newsletter.cljs:96
 #, unused
@@ -4677,15 +4677,15 @@ msgstr "Send me product updates (new features, releases, fixes...)."
 #, unused
 msgid "onboarding-v2.welcome.desc1"
 msgstr ""
-"Penpot is Open Source and it is made by Kaleidos as well as the community, "
+"Gridline is Open Source and it is made by Kaleidos as well as the community, "
 "where lots of people already help each other out. Everyone can collaborate "
 "by:"
 
 #, unused
 msgid "onboarding-v2.welcome.desc2"
 msgstr ""
-"A public space to learn, share and discuss about Penpot, its present and "
-"future with the entire Community and the Penpot core team."
+"A public space to learn, share and discuss about Gridline, its present and "
+"future with the entire Community and the Gridline core team."
 
 #, unused
 msgid "onboarding-v2.welcome.desc2.title"
@@ -4703,7 +4703,7 @@ msgstr "Contributing guide"
 
 #: src/app/main/ui/onboarding/team_choice.cljs:248
 msgid "onboarding-v2.welcome.title"
-msgstr "Welcome to Penpot!"
+msgstr "Welcome to Gridline!"
 
 #: src/app/main/ui/onboarding/team_choice.cljs:254
 #, unused
@@ -4859,11 +4859,11 @@ msgstr "Select .zip files"
 #: src/app/main/ui/onboarding/figma_import.cljs
 msgid "onboarding.figma-import.later"
 msgstr ""
-"You can do this later from the Drafts menu: Import Penpot files."
+"You can do this later from the Drafts menu: Import Gridline files."
 
 #: src/app/main/ui/onboarding/figma_import.cljs
 msgid "onboarding.figma-import.plugin-name"
-msgstr "Penpot Exporter"
+msgstr "Gridline Exporter"
 
 #: src/app/main/ui/onboarding/figma_import.cljs
 msgid "onboarding.figma-import.skip"
@@ -4910,7 +4910,7 @@ msgstr "Privacy Policy."
 #: src/app/main/ui/onboarding/newsletter.cljs:65
 #, unused
 msgid "onboarding.newsletter.title"
-msgstr "Want to receive Penpot news?"
+msgstr "Want to receive Gridline news?"
 
 #: src/app/main/ui/onboarding/questions.cljs:104
 msgid "onboarding.questions.lets-get-started"
@@ -4929,7 +4929,7 @@ msgstr "Just exploring"
 #: src/app/main/ui/onboarding/questions.cljs:245
 #, unused
 msgid "onboarding.questions.reasons.fit"
-msgstr "Reviewing whether Penpot is a good fit for my team"
+msgstr "Reviewing whether Gridline is a good fit for my team"
 
 #: src/app/main/ui/onboarding/questions.cljs:251
 #, unused
@@ -4973,17 +4973,17 @@ msgstr "Wireframing"
 
 #: src/app/main/ui/onboarding/questions.cljs:114
 msgid "onboarding.questions.step1.question1"
-msgstr "What will you be using Penpot for?"
+msgstr "What will you be using Gridline for?"
 
 #: src/app/main/ui/onboarding/questions.cljs:272
 #, unused
 msgid "onboarding.questions.step1.question2"
-msgstr "What brings you to Penpot today?"
+msgstr "What brings you to Gridline today?"
 
 #: src/app/main/ui/onboarding/questions.cljs:110
 msgid "onboarding.questions.step1.subtitle"
 msgstr ""
-"Let us know a bit about you to help us make Penpot work for you. Your "
+"Let us know a bit about you to help us make Gridline work for you. Your "
 "answers will help us prioritize new features and point you in the right "
 "direction to get started."
 
@@ -5020,7 +5020,7 @@ msgstr "Where would you like to get started?"
 #: src/app/main/ui/onboarding/questions.cljs:428
 #, unused
 msgid "onboarding.questions.step5.title"
-msgstr "How did you hear about Penpot?"
+msgstr "How did you hear about Gridline?"
 
 #: src/app/main/ui/onboarding/questions.cljs:226
 msgid "onboarding.questions.team-size.1001-5000"
@@ -5095,7 +5095,7 @@ msgstr "Create a team"
 #: src/app/main/ui/onboarding/team_choice.cljs:53
 msgid "onboarding.team-modal.create-team-desc"
 msgstr ""
-"A team allows you to collaborate with other Penpot users working in the "
+"A team allows you to collaborate with other Gridline users working in the "
 "same files and projects."
 
 #: src/app/main/ui/onboarding/team_choice.cljs:57
@@ -5132,7 +5132,7 @@ msgstr "Start designing"
 
 #, unused
 msgid "onboarding.welcome.alt"
-msgstr "Penpot"
+msgstr "Gridline"
 
 #: src/app/main/ui/workspace/sidebar/options/menus/token_typography_row.cljs:42, src/app/main/ui/workspace/sidebar/options/rows/color_row.cljs:101, src/app/main/ui/workspace/sidebar/options/rows/color_row.cljs:108
 msgid "options.deleted-token"
@@ -6132,7 +6132,7 @@ msgstr ""
 
 #: src/app/main/ui/settings/subscription.cljs:662
 msgid "subscription.settings.member-since"
-msgstr "Penpot member since: %s"
+msgstr "Gridline member since: %s"
 
 #: src/app/main/ui/settings/subscription.cljs:685, src/app/main/ui/settings/subscription.cljs:699, src/app/main/ui/settings/subscription.cljs:715, src/app/main/ui/settings/subscription.cljs:731
 msgid "subscription.settings.more-information"
@@ -6210,7 +6210,7 @@ msgstr "Enjoy your plan!"
 
 #: src/app/main/ui/settings/subscription.cljs:373
 msgid "subscription.settings.success.dialog.thanks"
-msgstr "Thank your for chosing the Penpot %s plan!"
+msgstr "Thank your for chosing the Gridline %s plan!"
 
 #: src/app/main/ui/settings/subscription.cljs:370
 msgid "subscription.settings.success.dialog.title"
@@ -6274,79 +6274,79 @@ msgstr[1] "%s invitations selected"
 
 #: src/app/main/ui/dashboard/files.cljs:179
 msgid "title.dashboard.files"
-msgstr "%s - Penpot"
+msgstr "%s - Gridline"
 
 #: src/app/main/ui/dashboard/fonts.cljs:50
 msgid "title.dashboard.font-providers"
-msgstr "Font Providers - %s - Penpot"
+msgstr "Font Providers - %s - Gridline"
 
 #: src/app/main/ui/dashboard/fonts.cljs:49
 msgid "title.dashboard.fonts"
-msgstr "Fonts - %s - Penpot"
+msgstr "Fonts - %s - Gridline"
 
 #: src/app/main/ui/dashboard/projects.cljs:354
 msgid "title.dashboard.projects"
-msgstr "Projects - %s - Penpot"
+msgstr "Projects - %s - Gridline"
 
 #: src/app/main/ui/dashboard/search.cljs:49
 msgid "title.dashboard.search"
-msgstr "Search - %s - Penpot"
+msgstr "Search - %s - Gridline"
 
 #: src/app/main/ui/dashboard/libraries.cljs:57
 msgid "title.dashboard.shared-libraries"
-msgstr "Shared Libraries - %s - Penpot"
+msgstr "Shared Libraries - %s - Gridline"
 
 #: src/app/main/ui/auth/verify_token.cljs:82, src/app/main/ui/auth.cljs:39
 msgid "title.default"
-msgstr "Penpot | Full-stack design"
+msgstr "Gridline | Full-stack design"
 
 #: src/app/main/ui/settings/feedback.cljs:161
 msgid "title.settings.feedback"
-msgstr "Give feedback - Penpot"
+msgstr "Give feedback - Gridline"
 
 #: src/app/main/ui/settings/integrations.cljs:659
 msgid "title.settings.integrations"
-msgstr "Integrations - Penpot"
+msgstr "Integrations - Gridline"
 
 #: src/app/main/ui/settings/notifications.cljs:45
 msgid "title.settings.notifications"
-msgstr "Notifications - Penpot"
+msgstr "Notifications - Gridline"
 
 #: src/app/main/ui/settings/options.cljs:123
 msgid "title.settings.options"
-msgstr "Settings - Penpot"
+msgstr "Settings - Gridline"
 
 #: src/app/main/ui/settings/password.cljs:105
 msgid "title.settings.password"
-msgstr "Password - Penpot"
+msgstr "Password - Gridline"
 
 #: src/app/main/ui/settings/profile.cljs:144
 msgid "title.settings.profile"
-msgstr "Profile - Penpot"
+msgstr "Profile - Gridline"
 
 #: src/app/main/ui/dashboard/team.cljs:1189
 msgid "title.team-invitations"
-msgstr "Invitations - %s - Penpot"
+msgstr "Invitations - %s - Gridline"
 
 #: src/app/main/ui/dashboard/team.cljs:614
 msgid "title.team-members"
-msgstr "Members - %s - Penpot"
+msgstr "Members - %s - Gridline"
 
 #: src/app/main/ui/dashboard/team.cljs:1575
 msgid "title.team-settings"
-msgstr "Settings - %s - Penpot"
+msgstr "Settings - %s - Gridline"
 
 #: src/app/main/ui/dashboard/team.cljs:1469
 msgid "title.team-webhooks"
-msgstr "Webhooks - %s - Penpot"
+msgstr "Webhooks - %s - Gridline"
 
 #: src/app/main/ui/viewer.cljs:422
 msgid "title.viewer"
-msgstr "%s - View mode - Penpot"
+msgstr "%s - View mode - Gridline"
 
 #: src/app/main/ui/workspace.cljs:239
 msgid "title.workspace"
-msgstr "%s - Penpot"
+msgstr "%s - Gridline"
 
 #: src/app/main/ui/ds/controls/utilities/token_field.cljs:106, src/app/main/ui/workspace/sidebar/options/menus/token_typography_row.cljs:67, src/app/main/ui/workspace/sidebar/options/rows/color_row.cljs:141
 msgid "token-actions.detach-token"
@@ -6428,7 +6428,7 @@ msgstr "Troubleshooting guide"
 #: src/app/main/ui/workspace/webgl_unavailable_modal.cljs:62
 msgid "webgl.modals.webgl-unavailable.message"
 msgstr ""
-"WebGL is not available in your browser, which is required for Penpot to "
+"WebGL is not available in your browser, which is required for Gridline to "
 "work. Please check your browser settings and/or close graphics-heavy tabs."
 
 #: src/app/main/ui/workspace/webgl_unavailable_modal.cljs:58
@@ -7501,7 +7501,7 @@ msgstr "Try using the following structure:"
 #: src/app/main/ui/workspace/sidebar/options/menus/variants_help_modal.cljs:54
 msgid "workspace.options.component.variants-help-modal.intro"
 msgstr ""
-"To keep changes when switching between variants, Penpot connects layers "
+"To keep changes when switching between variants, Gridline connects layers "
 "that:"
 
 #: src/app/main/ui/workspace/sidebar/options/menus/variants_help_modal.cljs:91

@@ -54,7 +54,7 @@
      [:button
       {:class (stl/css :exception-header)
        :on-click on-nav-root}
-      [:> raw-svg* {:id "penpot-logo-icon" :class (stl/css :penpot-logo)}]
+      [:> raw-svg* {:id "gridline-logo-icon" :class (stl/css :gridline-logo)}]
       (when profile-id
         [:div {:class (stl/css :go-back-wrapper)}
          [:> icon* {:icon-id i/arrow :class (stl/css :back-arrow)}] [:span (tr "not-found.no-permission.go-dashboard")]])]

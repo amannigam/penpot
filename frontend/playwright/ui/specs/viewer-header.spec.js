@@ -17,7 +17,7 @@ test("Clips link area of the logo", async ({ page }) => {
 
   const viewerUrl = page.url();
 
-  const logoLink = viewerPage.page.getByTestId("penpot-logo-link");
+  const logoLink = viewerPage.page.getByTestId("gridline-logo-link");
   await expect(logoLink).toBeVisible();
 
   const { x, y } = await logoLink.boundingBox();

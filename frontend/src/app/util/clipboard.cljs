@@ -71,7 +71,7 @@
    (from-data-transfer (.-dataTransfer ^js event) options)))
 
 (def ^:private unavailable-error-message
-  "Clipboard API is unavailable. This usually happens when the page is served over plain HTTP; serve Penpot over HTTPS to enable copy-to-clipboard.")
+  "Clipboard API is unavailable. This usually happens when the page is served over plain HTTP; serve Gridline over HTTPS to enable copy-to-clipboard.")
 
 (defn- get-clipboard
   "Return the active `navigator.clipboard` object, or nil when the

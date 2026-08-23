@@ -105,9 +105,9 @@ opencode.json
 /.codex/
 /tools/__pycache__
 
-# --- penpotter -----------------------------------------------------------
-penpotter/dev/.env
-penpotter/prod/.env
-penpotter/scripts/homelab.env
-penpotter/desktop/node_modules/
-penpotter/desktop/dist/
+# --- gridline -----------------------------------------------------------
+gridline/dev/.env
+gridline/prod/.env
+gridline/scripts/homelab.env
+gridline/desktop/node_modules/
+gridline/desktop/dist/
