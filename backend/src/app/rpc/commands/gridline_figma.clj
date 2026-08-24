@@ -30,6 +30,7 @@
    [app.gridline.figma.convert :as figma.convert]
    [app.http.client :as http]
    [app.rpc :as-alias rpc]
+   [app.rpc.commands.media :as media]
    [app.rpc.commands.projects :as projects]
    [app.db :as db]
    [app.rpc.doc :as-alias doc]
@@ -144,20 +145,62 @@
 
   (let [document (figma/get-file cfg token file-key)
 
-        {:keys [file report]}
+        ;; First pass discovers which images the document references. It is a
+        ;; pure conversion, so running it twice is cheaper and far less
+        ;; fragile than rewriting fills inside an already-built file.
+        {:keys [file image-refs]}
         (figma.convert/document->file document {:project-id project-id
                                                 :file-name name})
 
         file (assoc file :project-id project-id)]
 
-    (l/inf :hint "importing figma file"
-           :file-key file-key
-           :pages (:pages report)
-           :shapes (:shapes report)
-           :unsupported (:unsupported report))
-
     (bfc/save-file! (assoc cfg ::bfc/timestamp (ct/now)) file)
 
-    {:file-id (:id file)
-     :name (:name file)
-     :report report}))
+    (let [;; Media rows reference the file, so they can only be created once
+          ;; it exists -- hence save first, then images, then re-save.
+          media
+          (when (seq image-refs)
+            (let [urls (figma/get-image-urls cfg token file-key)]
+              (reduce
+               (fn [acc ref]
+                 (if-let [url (get urls (keyword ref))]
+                   (try
+                     (let [mobj (#'media/create-file-media-object-from-url
+                                 cfg {:url url
+                                      :file-id (:id file)
+                                      :is-local true
+                                      :name (str "figma-" ref)
+                                      :profile-id profile-id})]
+                       (assoc acc ref (select-keys mobj [:id :width :height :mtype])))
+                     (catch Throwable cause
+                       ;; One unreachable image must not lose the import.
+                       (l/wrn :hint "skipping figma image" :image-ref ref :cause cause)
+                       acc))
+                   acc))
+               {}
+               image-refs)))
+
+          ;; Second pass, now able to resolve image fills.
+          {file :file report :report}
+          (if (seq media)
+            (figma.convert/document->file document {:project-id project-id
+                                                    :file-name name
+                                                    :media media})
+            (figma.convert/document->file document {:project-id project-id
+                                                    :file-name name}))
+
+          file (-> file (assoc :project-id project-id) (assoc :id (:id file)))]
+
+      (when (seq media)
+        (bfc/update-file! (assoc cfg ::bfc/timestamp (ct/now)) file))
+
+      (l/inf :hint "imported figma file"
+             :file-key file-key
+             :pages (:pages report)
+             :shapes (:shapes report)
+             :images (count media)
+             :unsupported (:unsupported report))
+
+      {:file-id (:id file)
+       :name (:name file)
+       :report (assoc report :images-imported (count media))})))

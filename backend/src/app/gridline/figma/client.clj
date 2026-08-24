@@ -55,6 +55,16 @@
   (l/inf :hint "fetching figma file" :file-key file-key)
   (request cfg token (str "/v1/files/" file-key "?geometry=paths")))
 
+(defn get-image-urls
+  "GET /v1/files/:key/images -> {imageRef -> url}.
+
+  Image paints reference an imageRef rather than carrying pixels, and this
+  endpoint is the only way to resolve one to something downloadable. The URLs
+  are short-lived S3 links, so they are fetched per import rather than stored."
+  [cfg token file-key]
+  (let [resp (request cfg token (str "/v1/files/" file-key "/images"))]
+    (get-in resp [:meta :images] {})))
+
 (defn get-file-meta
   "Cheap metadata call, used to name the file and to fail early on a bad key
   or a missing scope before pulling megabytes of document."

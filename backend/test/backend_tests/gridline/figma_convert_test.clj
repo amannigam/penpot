@@ -252,3 +252,37 @@
     (t/testing "paragraph alignment carries"
       (t/is (= "center" (get-in (get by-name "Styled")
                                 [:content :children 0 :children 0 :text-align]))))))
+
+(t/deftest resolves-image-fills
+  (let [doc {:name "Images"
+             :document
+             {:type "DOCUMENT"
+              :children
+              [{:type "CANVAS" :name "P"
+                :children
+                [{:type "RECTANGLE" :name "Photo"
+                  :absoluteTransform [[1 0 0] [0 1 0]] :size {:x 100 :y 80}
+                  :fills [{:type "IMAGE" :imageRef "abc123" :opacity 1}]}]}]}}]
+
+    (t/testing "the discovery pass collects refs and emits no image fill yet"
+      (let [{:keys [image-refs file]} (sut/document->file doc {:project-id (uuid/next)})
+            page-id (first (get-in file [:data :pages]))
+            shape   (->> (get-in file [:data :pages-index page-id :objects])
+                         vals (filter #(= "Photo" (:name %))) first)]
+        (t/is (= #{"abc123"} image-refs))
+        (t/is (empty? (:fills shape)))))
+
+    (t/testing "the second pass resolves them against the created media"
+      (let [media-id (uuid/next)
+            {:keys [file report]}
+            (sut/document->file doc {:project-id (uuid/next)
+                                     :media {"abc123" {:id media-id
+                                                       :width 100 :height 80
+                                                       :mtype "image/png"}}})
+            page-id (first (get-in file [:data :pages]))
+            shape   (->> (get-in file [:data :pages-index page-id :objects])
+                         vals (filter #(= "Photo" (:name %))) first)
+            fill    (first (:fills shape))]
+        (t/is (= media-id (get-in fill [:fill-image :id])))
+        (t/is (= "image/png" (get-in fill [:fill-image :mtype])))
+        (t/is (= 1 (:images report)))))))

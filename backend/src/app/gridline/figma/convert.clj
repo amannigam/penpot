@@ -37,12 +37,39 @@
   [{:keys [r g b]}]
   (str "#" (channel->hex r) (channel->hex g) (channel->hex b)))
 
+(def ^:dynamic *media*
+  "imageRef -> {:id :width :height :mtype}, resolved before the second
+  conversion pass. Empty on the discovery pass, when image fills are simply
+  skipped and their refs collected."
+  {})
+
+(def ^:dynamic *image-refs*
+  "Collects the imageRefs seen while converting, so the caller knows which
+  images to fetch."
+  nil)
+
 (defn- paint->fill
-  [{:keys [type color opacity visible] :as paint}]
-  (when (and (not= false visible) (= "SOLID" type))
+  [{:keys [type color opacity visible imageRef] :as _paint}]
+  (cond
+    (= false visible) nil
+
+    (= "SOLID" type)
     (let [alpha (* (d/nilv (:a color) 1.0) (d/nilv opacity 1.0))]
       {:fill-color (color->hex color)
-       :fill-opacity alpha})))
+       :fill-opacity alpha})
+
+    (= "IMAGE" type)
+    (do
+      (when (and imageRef *image-refs*) (swap! *image-refs* conj imageRef))
+      (when-let [{:keys [id width height mtype]} (get *media* imageRef)]
+        {:fill-opacity (d/nilv opacity 1.0)
+         :fill-image {:id id
+                      :width width
+                      :height height
+                      :mtype mtype
+                      :keep-aspect-ratio true}}))
+
+    :else nil))
 
 (defn- paints->fills
   "Figma paints the list bottom-up relative to Penpot, so the order is
@@ -480,16 +507,21 @@
   Returns {:file <file> :report {...}}. The report is not decoration: this
   converter is partial by design and the caller shows the user what it could
   not represent."
-  [{:keys [document name]} {:keys [project-id file-name]}]
-  (let [pages (filter #(= "CANVAS" (:type %)) (:children document))
+  [{:keys [document name]} {:keys [project-id file-name media]}]
+  (let [refs  (atom #{})
+        pages (filter #(= "CANVAS" (:type %)) (:children document))
         state (-> (fb/create-state)
                   (fb/add-file {:name (or file-name name "Figma import")
                                 :project-id project-id}))
-        state (reduce convert-page state pages)
-        state (fb/close-file state)
+        state (binding [*media* (or media {})
+                        *image-refs* refs]
+                (-> (reduce convert-page state pages)
+                    (fb/close-file)))
         file  (-> state ::fb/files vals first)]
 
     {:file file
+     :image-refs @refs
      :report (-> (::report state)
                  (assoc :pages (count pages))
+                 (assoc :images (count @refs))
                  (update :shapes (fnil identity 0)))}))
