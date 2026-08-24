@@ -18,6 +18,7 @@
   (:require
    [app.common.data :as d]
    [app.common.files.builder :as fb]
+   [app.common.geom.matrix :as gmt]
    [app.common.geom.point :as gpt]
    [app.common.logging :as l]
    [app.common.types.path :as path]
@@ -50,17 +51,73 @@
   [paints]
   (into [] (comp (keep paint->fill) (map identity)) (reverse paints)))
 
+(def ^:private stroke-alignments
+  {"CENTER" :center "INSIDE" :inner "OUTSIDE" :outer})
+
+(defn- stroke-weight
+  "Figma reports mixed per-side weights separately; the plugin takes the
+  largest, since Penpot has a single width."
+  [{:keys [strokeWeight strokeTopWeight strokeRightWeight
+           strokeBottomWeight strokeLeftWeight]}]
+  (or strokeWeight
+      (when-let [ws (seq (keep identity [strokeTopWeight strokeRightWeight
+                                         strokeBottomWeight strokeLeftWeight]))]
+        (apply max ws))
+      1))
+
 (defn- paints->strokes
-  [paints weight]
+  "Reversed for the same reason as fills, and carrying alignment and dash
+  state, which were previously hardcoded to centred and solid."
+  [{:keys [strokes strokeAlign dashPattern] :as node}]
+  (let [width (stroke-weight node)
+        align (get stroke-alignments strokeAlign :center)
+        style (if (seq dashPattern) :dashed :solid)]
+    (into []
+          (keep (fn [paint]
+                  (when-let [fill (paint->fill paint)]
+                    {:stroke-color (:fill-color fill)
+                     :stroke-opacity (:fill-opacity fill)
+                     :stroke-width width
+                     :stroke-style style
+                     :stroke-alignment align})))
+          (reverse strokes))))
+
+;; --- effects ---------------------------------------------------------------
+
+(def ^:private blend-modes
+  {"PASS_THROUGH" :normal "NORMAL" :normal
+   "DARKEN" :darken "LINEAR_BURN" :darken
+   "MULTIPLY" :multiply "COLOR_BURN" :color-burn
+   "LIGHTEN" :lighten "SCREEN" :screen
+   "COLOR_DODGE" :color-dodge "LINEAR_DODGE" :color-dodge
+   "OVERLAY" :overlay "SOFT_LIGHT" :soft-light "HARD_LIGHT" :hard-light
+   "DIFFERENCE" :difference "EXCLUSION" :exclusion
+   "HUE" :hue "SATURATION" :saturation "COLOR" :color "LUMINOSITY" :luminosity})
+
+(defn- shadows
+  "Drop and inner shadows, in Figma's paint order (the reverse of the array)."
+  [effects]
   (into []
-        (keep (fn [paint]
-                (when-let [fill (paint->fill paint)]
-                  {:stroke-color (:fill-color fill)
-                   :stroke-opacity (:fill-opacity fill)
-                   :stroke-width (d/nilv weight 1)
-                   :stroke-style :solid
-                   :stroke-alignment :center})))
-        paints))
+        (comp (filter #(contains? #{"DROP_SHADOW" "INNER_SHADOW"} (:type %)))
+              (map (fn [{:keys [type offset radius spread color visible]}]
+                     {:id (uuid/next)
+                      :style (if (= "INNER_SHADOW" type) :inner-shadow :drop-shadow)
+                      :offset-x (d/nilv (:x offset) 0)
+                      :offset-y (d/nilv (:y offset) 0)
+                      :blur (d/nilv radius 0)
+                      :spread (d/nilv spread 0)
+                      :hidden (= false visible)
+                      :color {:color (color->hex color)
+                              :opacity (d/nilv (:a color) 1)}})))
+        (reverse effects)))
+
+(defn- blur
+  [effects]
+  (when-let [b (first (filter #(= "LAYER_BLUR" (:type %)) effects))]
+    {:id (uuid/next)
+     :type :layer-blur
+     :value (d/nilv (:radius b) 0)
+     :hidden (= false (:visible b))}))
 
 ;; --- geometry --------------------------------------------------------------
 
@@ -82,18 +139,64 @@
      :width (max 0.01 (d/nilv w 1))
      :height (max 0.01 (d/nilv h 1))}))
 
-(defn- rotation
-  "Figma's affine matrix is [[cos -sin tx] [sin cos ty]], so the rotation is
-  atan2 of the first column. Penpot stores degrees."
-  [{:keys [absoluteTransform]}]
-  (when-let [m absoluteTransform]
-    (let [m00 (get-in m [0 0])
-          m10 (get-in m [1 0])]
-      (when (and (number? m00) (number? m10))
-        (let [deg (-> (Math/atan2 (double m10) (double m00))
-                      (Math/toDegrees))
-              deg (mod (- 360.0 deg) 360.0)]
-          (when (> (Math/abs deg) 0.01) deg))))))
+(defn- m [t r c] (get-in t [r c]))
+
+(defn- clean-number
+  [v]
+  (if (< (Math/abs (double (or v 0))) 1e-6) 0.0 (double v)))
+
+(defn- identity-transform?
+  [t]
+  (and (= 1.0 (clean-number (m t 0 0)))
+       (= 0.0 (clean-number (m t 0 1)))
+       (= 0.0 (clean-number (m t 1 0)))
+       (= 1.0 (clean-number (m t 1 1)))))
+
+(defn- get-rotation
+  "acos of the first matrix element, in degrees -- the same derivation the
+  exporter plugin uses, so rotated shapes agree with what it produces."
+  [t]
+  (-> (Math/acos (max -1.0 (min 1.0 (double (m t 0 0)))))
+      (Math/toDegrees)))
+
+(defn- apply-matrix
+  [t {:keys [x y]}]
+  {:x (+ (* x (m t 0 0)) (* y (m t 0 1)))
+   :y (+ (* x (m t 1 0)) (* y (m t 1 1)))})
+
+(defn- inverse-transform
+  [t]
+  [[(m t 0 0) (m t 1 0) (m t 0 2)]
+   [(m t 0 1) (m t 1 1) (m t 1 2)]])
+
+(defn- apply-inverse-rotation
+  "Rotate a point back around the bounding box centre. Penpot stores the
+  unrotated reference point plus a transform; Figma gives the rotated
+  position, so it has to be undone."
+  [point t bbox]
+  (let [cx (+ (:x bbox) (/ (:width bbox) 2.0))
+        cy (+ (:y bbox) (/ (:height bbox) 2.0))
+        p  (apply-matrix (inverse-transform t)
+                         {:x (- (:x point) cx) :y (- (:y point) cy)})]
+    {:x (+ cx (:x p)) :y (+ cy (:y p))}))
+
+(defn- rotation-props
+  "Position, rotation and the transform pair.
+
+  Untransformed nodes -- the overwhelming majority -- carry no transform at
+  all, matching the plugin's translateZeroRotation."
+  [{:keys [absoluteTransform absoluteBoundingBox] :as node}]
+  (let [t absoluteTransform]
+    (if (or (nil? t) (nil? absoluteBoundingBox) (identity-transform? t))
+      nil
+      (let [x (m t 0 2)
+            y (m t 1 2)
+            p (apply-inverse-rotation {:x x :y y} t absoluteBoundingBox)]
+        {:x (:x p)
+         :y (:y p)
+         :rotation (get-rotation t)
+         :transform (gmt/matrix (m t 0 0) (m t 1 0) (m t 0 1) (m t 1 1) 0 0)
+         :transform-inverse (gmt/matrix (m t 0 0) (m t 0 1) (m t 1 0) (m t 1 1) 0 0)}))))
 
 (defn- corner-radii
   "Penpot models corners as r1..r4 (top-left, top-right, bottom-right,
@@ -115,10 +218,17 @@
     (some? (:opacity node)) (assoc :opacity (:opacity node))
     (false? (:visible node)) (assoc :hidden true)
     (seq (:fills node)) (assoc :fills (paints->fills (:fills node)))
-    (seq (:strokes node)) (assoc :strokes (paints->strokes (:strokes node)
-                                                           (:strokeWeight node)))
-    (some? (rotation node)) (assoc :rotation (rotation node))
-    (some? (corner-radii node)) (merge (corner-radii node))))
+    (seq (:strokes node)) (assoc :strokes (paints->strokes node))
+    (some? (get blend-modes (:blendMode node)))
+    (assoc :blend-mode (get blend-modes (:blendMode node)))
+    (seq (shadows (:effects node))) (assoc :shadow (shadows (:effects node)))
+    (some? (blur (:effects node))) (assoc :blur (blur (:effects node)))
+    (some? (corner-radii node)) (merge (corner-radii node))
+    ;; Overrides x/y as well: a rotated node's stored position is the
+    ;; unrotated reference point, not where Figma reports it.
+    (some? (rotation-props node)) (merge (rotation-props node))
+    ;; Figma's locked maps to Penpot's blocked.
+    (true? (:locked node)) (assoc :blocked true)))
 
 ;; --- text ------------------------------------------------------------------
 

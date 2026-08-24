@@ -6,6 +6,7 @@
 
 (ns backend-tests.gridline.figma-convert-test
   (:require
+   [app.common.data :as d]
    [app.common.uuid :as uuid]
    [app.gridline.figma.convert :as sut]
    [clojure.test :as t]))
@@ -197,18 +198,35 @@
         objects (get-in file [:data :pages-index page-id :objects])
         by-name (into {} (map (juxt :name identity)) (vals objects))]
 
-    (t/testing "position and size come from the transform, not the bounding box"
-      ;; absoluteBoundingBox is the post-rotation envelope, so for a rotated
-      ;; node it is both larger and offset. Using it put shapes in the wrong
-      ;; place at the wrong size.
+    (t/testing "size comes from the node, not its bounding box"
+      ;; absoluteBoundingBox is the post-rotation envelope: 99x99 here for a
+      ;; 50x20 shape. Using it made every rotated node the wrong size.
       (let [shape (get by-name "Rotated")]
-        (t/is (= 100.0 (double (:x shape))))
-        (t/is (= 200.0 (double (:y shape))))
         (t/is (= 50.0 (double (:width shape))))
         (t/is (= 20.0 (double (:height shape))))))
 
-    (t/testing "rotation is derived from the transform"
-      (t/is (= 315 (int (:rotation (get by-name "Rotated"))))))
+    (t/testing "a rotated node stores its unrotated reference point"
+      ;; Penpot holds position before rotation plus a transform, while Figma
+      ;; reports the rotated position, so the rotation is undone about the
+      ;; bounding box centre -- the same derivation the exporter plugin uses.
+      ;; centre (129.5,239.5); (100,200) inverse-rotated lands at (80.71,232.43).
+      (let [shape (get by-name "Rotated")]
+        (t/is (< (Math/abs (- 80.71 (double (:x shape)))) 0.01))
+        (t/is (< (Math/abs (- 232.43 (double (:y shape)))) 0.01))))
+
+    (t/testing "rotation and both transform matrices are set"
+      (let [shape (get by-name "Rotated")]
+        (t/is (= 45 (int (:rotation shape))))
+        (t/is (some? (:transform shape)))
+        (t/is (some? (:transform-inverse shape)))))
+
+    (t/testing "an untransformed node keeps its plain position"
+      ;; No inverse rotation is applied, and setup-shape leaves the default
+      ;; identity matrix rather than one derived from Figma.
+      (let [shape (get by-name "Corners")]
+        (t/is (= 10.0 (double (:x shape))))
+        (t/is (= 20.0 (double (:y shape))))
+        (t/is (zero? (int (d/nilv (:rotation shape) 0))))))
 
     (t/testing "corner radii use r1..r4, uniform and per-corner"
       (let [uniform (get by-name "Rotated")
