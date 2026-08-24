@@ -161,3 +161,76 @@
 
     (t/testing "only the genuinely unconvertible node is reported"
       (t/is (= {"SLICE" 1} (:unsupported report))))))
+
+(def ^:private fidelity-document
+  {:name "Fidelity"
+   :document
+   {:type "DOCUMENT"
+    :children
+    [{:type "CANVAS" :name "P"
+      :children
+      [{:type "RECTANGLE" :name "Rotated"
+        ;; the bounding box deliberately disagrees with the transform
+        :absoluteTransform [[0.7071 -0.7071 100] [0.7071 0.7071 200]]
+        :size {:x 50 :y 20}
+        :absoluteBoundingBox {:x 80 :y 190 :width 99 :height 99}
+        :cornerRadius 8}
+       {:type "RECTANGLE" :name "Corners"
+        :absoluteTransform [[1 0 10] [0 1 20]]
+        :size {:x 40 :y 40}
+        :rectangleCornerRadii [1 2 3 4]}
+       {:type "RECTANGLE" :name "TwoFills"
+        :absoluteTransform [[1 0 0] [0 1 0]] :size {:x 10 :y 10}
+        :fills [{:type "SOLID" :color {:r 1 :g 0 :b 0 :a 1}}
+                {:type "SOLID" :color {:r 0 :g 0 :b 1 :a 1}}]}
+       {:type "TEXT" :name "Styled"
+        :absoluteTransform [[1 0 5] [0 1 6]] :size {:x 200 :y 30}
+        :characters "Hello"
+        :style {:fontFamily "Sora" :fontSize 24 :fontWeight 700
+                :lineHeightPx 36 :letterSpacing 1.5
+                :textAlignHorizontal "CENTER" :textCase "UPPER"}
+        :fills [{:type "SOLID" :color {:r 0 :g 0 :b 0 :a 1}}]}]}]}})
+
+(t/deftest matches-figma-geometry-and-styling
+  (let [{:keys [file]} (sut/document->file fidelity-document {:project-id (uuid/next)})
+        page-id (first (get-in file [:data :pages]))
+        objects (get-in file [:data :pages-index page-id :objects])
+        by-name (into {} (map (juxt :name identity)) (vals objects))]
+
+    (t/testing "position and size come from the transform, not the bounding box"
+      ;; absoluteBoundingBox is the post-rotation envelope, so for a rotated
+      ;; node it is both larger and offset. Using it put shapes in the wrong
+      ;; place at the wrong size.
+      (let [shape (get by-name "Rotated")]
+        (t/is (= 100.0 (double (:x shape))))
+        (t/is (= 200.0 (double (:y shape))))
+        (t/is (= 50.0 (double (:width shape))))
+        (t/is (= 20.0 (double (:height shape))))))
+
+    (t/testing "rotation is derived from the transform"
+      (t/is (= 315 (int (:rotation (get by-name "Rotated"))))))
+
+    (t/testing "corner radii use r1..r4, uniform and per-corner"
+      (let [uniform (get by-name "Rotated")
+            corners (get by-name "Corners")]
+        (t/is (= [8 8 8 8] (mapv #(get uniform %) [:r1 :r2 :r3 :r4])))
+        (t/is (= [1 2 3 4] (mapv #(get corners %) [:r1 :r2 :r3 :r4])))))
+
+    (t/testing "fills are reversed, because Figma stacks them the other way"
+      (t/is (= ["#0000ff" "#ff0000"]
+               (mapv :fill-color (:fills (get by-name "TwoFills"))))))
+
+    (t/testing "text carries its actual font, not Penpot's default"
+      (let [run (get-in (get by-name "Styled")
+                        [:content :children 0 :children 0 :children 0])]
+        (t/is (= "Sora" (:font-family run)))
+        (t/is (= "gfont-sora" (:font-id run)))
+        (t/is (= "700" (:font-weight run)))
+        (t/is (= "24" (:font-size run)))
+        (t/testing "line height is a ratio of font size, not pixels"
+          (t/is (= "1.5" (:line-height run))))
+        (t/is (= "uppercase" (:text-transform run)))))
+
+    (t/testing "paragraph alignment carries"
+      (t/is (= "center" (get-in (get by-name "Styled")
+                                [:content :children 0 :children 0 :text-align]))))))

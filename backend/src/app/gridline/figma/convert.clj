@@ -44,8 +44,11 @@
        :fill-opacity alpha})))
 
 (defn- paints->fills
+  "Figma paints the list bottom-up relative to Penpot, so the order is
+  reversed -- the plugin does the same. With one fill it makes no difference;
+  with several it is the difference between the right and wrong colour on top."
   [paints]
-  (into [] (keep paint->fill) paints))
+  (into [] (comp (keep paint->fill) (map identity)) (reverse paints)))
 
 (defn- paints->strokes
   [paints weight]
@@ -62,15 +65,48 @@
 ;; --- geometry --------------------------------------------------------------
 
 (defn- geometry
-  "Figma reports absolute coordinates, and Penpot also positions shapes in
-  absolute page space -- parenting is expressed through frame-id, not nested
-  transforms -- so these carry across directly."
-  [{:keys [absoluteBoundingBox]}]
-  (let [{:keys [x y width height]} absoluteBoundingBox]
-    {:x (d/nilv x 0)
-     :y (d/nilv y 0)
-     :width (max 1 (d/nilv width 1))
-     :height (max 1 (d/nilv height 1))}))
+  "Position and size.
+
+  Taken from absoluteTransform and size, not absoluteBoundingBox. The bounding
+  box is the post-rotation envelope: for any rotated or skewed node it is both
+  larger than the shape and offset from it, which is why shapes landed in the
+  wrong place and the wrong size. The plugin reads
+  absoluteTransform[0][2]/[1][2] for the same reason."
+  [{:keys [absoluteTransform size absoluteBoundingBox]}]
+  (let [tx (get-in absoluteTransform [0 2])
+        ty (get-in absoluteTransform [1 2])
+        w  (or (:x size) (:width absoluteBoundingBox))
+        h  (or (:y size) (:height absoluteBoundingBox))]
+    {:x (d/nilv tx (d/nilv (:x absoluteBoundingBox) 0))
+     :y (d/nilv ty (d/nilv (:y absoluteBoundingBox) 0))
+     :width (max 0.01 (d/nilv w 1))
+     :height (max 0.01 (d/nilv h 1))}))
+
+(defn- rotation
+  "Figma's affine matrix is [[cos -sin tx] [sin cos ty]], so the rotation is
+  atan2 of the first column. Penpot stores degrees."
+  [{:keys [absoluteTransform]}]
+  (when-let [m absoluteTransform]
+    (let [m00 (get-in m [0 0])
+          m10 (get-in m [1 0])]
+      (when (and (number? m00) (number? m10))
+        (let [deg (-> (Math/atan2 (double m10) (double m00))
+                      (Math/toDegrees))
+              deg (mod (- 360.0 deg) 360.0)]
+          (when (> (Math/abs deg) 0.01) deg))))))
+
+(defn- corner-radii
+  "Penpot models corners as r1..r4 (top-left, top-right, bottom-right,
+  bottom-left). rx/ry -- which is what this used before -- is a different
+  attribute entirely, so radii were silently ignored."
+  [{:keys [cornerRadius rectangleCornerRadii]}]
+  (cond
+    (and (vector? rectangleCornerRadii) (= 4 (count rectangleCornerRadii)))
+    (let [[tl tr br bl] rectangleCornerRadii]
+      {:r1 tl :r2 tr :r3 br :r4 bl})
+
+    (and (number? cornerRadius) (pos? cornerRadius))
+    {:r1 cornerRadius :r2 cornerRadius :r3 cornerRadius :r4 cornerRadius}))
 
 (defn- base-props
   [node]
@@ -81,27 +117,83 @@
     (seq (:fills node)) (assoc :fills (paints->fills (:fills node)))
     (seq (:strokes node)) (assoc :strokes (paints->strokes (:strokes node)
                                                            (:strokeWeight node)))
-    (number? (:cornerRadius node)) (assoc :rx (:cornerRadius node)
-                                          :ry (:cornerRadius node))))
+    (some? (rotation node)) (assoc :rotation (rotation node))
+    (some? (corner-radii node)) (merge (corner-radii node))))
 
 ;; --- text ------------------------------------------------------------------
 
+(defn- font-slug
+  "Penpot identifies Google fonts as gfont-<slugified family>, which is how
+  the exporter plugin resolves them too."
+  [family]
+  (-> (or family "")
+      (str/lower)
+      (str/replace #"[^a-z0-9]+" "-")
+      (str/replace #"^-+|-+$" "")))
+
+(defn- line-height
+  "Penpot stores line height as a ratio of the font size, not pixels."
+  [{:keys [lineHeightPx lineHeightPercentFontSize fontSize]}]
+  (cond
+    (and (number? lineHeightPx) (number? fontSize) (pos? fontSize))
+    (str (/ (double lineHeightPx) (double fontSize)))
+
+    (number? lineHeightPercentFontSize)
+    (str (/ (double lineHeightPercentFontSize) 100.0))
+
+    :else "1.2"))
+
+(defn- letter-spacing
+  [{:keys [letterSpacing]}]
+  (str (d/nilv letterSpacing 0)))
+
+(defn- text-align
+  [{:keys [textAlignHorizontal]}]
+  (case textAlignHorizontal
+    "RIGHT" "right"
+    "CENTER" "center"
+    "JUSTIFIED" "justify"
+    "left"))
+
+(defn- vertical-align
+  [{:keys [textAlignVertical]}]
+  (case textAlignVertical
+    "CENTER" "center"
+    "BOTTOM" "bottom"
+    "top"))
+
+(defn- text-run
+  "One styled run. The font family was missing entirely before, which is why
+  imported text rendered in Penpot's default face regardless of the design."
+  [line style fills]
+  (let [family (d/nilv (:fontFamily style) "Source Sans Pro")]
+    (cond-> {:text line
+             :font-family family
+             :font-id (str "gfont-" (font-slug family))
+             :font-size (str (d/nilv (:fontSize style) 14))
+             :font-weight (str (int (d/nilv (:fontWeight style) 400)))
+             :font-style (if (:italic style) "italic" "normal")
+             :font-variant-id (if (:italic style) "italic" "regular")
+             :line-height (line-height style)
+             :letter-spacing (letter-spacing style)
+             :fills (if (seq fills)
+                      fills
+                      [{:fill-color "#000000" :fill-opacity 1}])}
+      (= "UPPER" (:textCase style)) (assoc :text-transform "uppercase")
+      (= "LOWER" (:textCase style)) (assoc :text-transform "lowercase")
+      (= "TITLE" (:textCase style)) (assoc :text-transform "capitalize")
+      (= "UNDERLINE" (:textDecoration style)) (assoc :text-decoration "underline")
+      (= "STRIKETHROUGH" (:textDecoration style)) (assoc :text-decoration "line-through"))))
+
 (defn- text-content
-  "Penpot text is a tree: root > paragraph-set > paragraph > text runs. Figma
-  gives us the flat string plus one TypeStyle, which is enough for a faithful
-  single-style paragraph per line."
+  "Penpot text is a tree: root > paragraph-set > paragraph > runs. Figma gives
+  a flat string plus one TypeStyle, so each line becomes a paragraph carrying
+  that style."
   [{:keys [characters style] :as _node} fills]
-  (let [font-size (some-> (:fontSize style) (str))
-        weight    (some-> (:fontWeight style) (int) (str))
-        runs      (fn [line]
-                    [(cond-> {:text line
-                              :fills (if (seq fills)
-                                       fills
-                                       [{:fill-color "#000000" :fill-opacity 1}])}
-                       font-size (assoc :font-size font-size)
-                       weight (assoc :font-weight weight)
-                       (:italic style) (assoc :font-style "italic"))])]
+  (let [align (text-align style)
+        valign (vertical-align style)]
     {:type "root"
+     :vertical-align valign
      :children
      [{:type "paragraph-set"
        :children
@@ -109,7 +201,8 @@
              (map (fn [line]
                     {:type "paragraph"
                      :key (str (uuid/next))
-                     :children (runs line)}))
+                     :text-align align
+                     :children [(text-run line style fills)]}))
              (str/split (d/nilv characters "") #"\n"))}]}))
 
 ;; --- nodes -----------------------------------------------------------------
