@@ -206,7 +206,12 @@ Next for the importer, roughly in order of value:
    instances stay linked rather than flattened to boards.
 5. **Auto-layout** -- Figma layout modes onto Penpot flex layout.
 
-**Still open.** Auto-matching depends on the exporter naming its zip after the
+**Superseded by the real importer.** The zip/plugin round trip is now a
+fallback rather than the path. See `IMPORTER.md` for what the importer
+converts and `NEXT-SESSION.md` for what is left. Components are the next
+substantial piece.
+
+**Historical note.** Auto-matching depends on the exporter naming its zip after the
 file; unmatched zips import fine but leave the row unticked. The worklist is
 component state, so it does not survive a reload yet — persist it in profile
 props next.
