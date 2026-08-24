@@ -286,3 +286,76 @@
         (t/is (= media-id (get-in fill [:fill-image :id])))
         (t/is (= "image/png" (get-in fill [:fill-image :mtype])))
         (t/is (= 1 (:images report)))))))
+
+(t/deftest converts-constraints-and-auto-layout
+  (let [doc {:name "Layout"
+             :document
+             {:type "DOCUMENT"
+              :children
+              [{:type "CANVAS" :name "P"
+                :children
+                [{:type "FRAME" :name "Row"
+                  :absoluteTransform [[1 0 0] [0 1 0]] :size {:x 300 :y 100}
+                  :layoutMode "HORIZONTAL"
+                  :layoutWrap "WRAP"
+                  :itemSpacing 12
+                  :counterAxisSpacing 8
+                  :primaryAxisAlignItems "CENTER"
+                  :counterAxisAlignItems "MAX"
+                  :paddingTop 4 :paddingRight 6 :paddingBottom 4 :paddingLeft 6
+                  :children
+                  [{:type "RECTANGLE" :name "Child"
+                    :absoluteTransform [[1 0 10] [0 1 10]] :size {:x 20 :y 20}
+                    :constraints {:horizontal "STRETCH" :vertical "CENTER"}
+                    :layoutSizingHorizontal "FILL"
+                    :layoutSizingVertical "HUG"
+                    :layoutAlign "STRETCH"}]}
+                 {:type "FRAME" :name "Column"
+                  :absoluteTransform [[1 0 0] [0 1 200]] :size {:x 100 :y 300}
+                  :layoutMode "VERTICAL" :itemSpacing 5
+                  :primaryAxisAlignItems "SPACE_BETWEEN"
+                  :paddingTop 1 :paddingRight 2 :paddingBottom 3 :paddingLeft 4}
+                 {:type "FRAME" :name "Plain"
+                  :absoluteTransform [[1 0 0] [0 1 600]] :size {:x 50 :y 50}
+                  :layoutMode "NONE"}]}]}}
+        {:keys [file]} (sut/document->file doc {:project-id (uuid/next)})
+        page-id (first (get-in file [:data :pages]))
+        by-name (into {} (map (juxt :name identity))
+                      (vals (get-in file [:data :pages-index page-id :objects])))]
+
+    (t/testing "a horizontal auto-layout frame becomes flex"
+      (let [row (get by-name "Row")]
+        (t/is (= :flex (:layout row)))
+        ;; reversed on purpose: Penpot orders flex children opposite to Figma
+        (t/is (= :row-reverse (:layout-flex-dir row)))
+        (t/is (= :center (:layout-justify-content row)))
+        (t/is (= :end (:layout-align-items row)))
+        (t/is (= :wrap (:layout-wrap-type row)))
+        (t/testing "spacing splits across the right axes"
+          (t/is (= 12 (get-in row [:layout-gap :column-gap])))
+          (t/is (= 8 (get-in row [:layout-gap :row-gap]))))
+        (t/testing "symmetric padding is reported as simple"
+          (t/is (= :simple (:layout-padding-type row)))
+          (t/is (= 4 (get-in row [:layout-padding :p1]))))))
+
+    (t/testing "vertical layout puts the spacing on the other axis"
+      (let [col (get by-name "Column")]
+        (t/is (= :column-reverse (:layout-flex-dir col)))
+        ;; SPACE_BETWEEN carries the spacing itself, so the gap is zero
+        (t/is (= 0 (get-in col [:layout-gap :row-gap])))
+        (t/is (= :space-between (:layout-justify-content col)))
+        (t/is (= :multiple (:layout-padding-type col)))))
+
+    (t/testing "a frame without auto-layout gets no layout at all"
+      (t/is (nil? (:layout (get by-name "Plain")))))
+
+    (t/testing "constraints convert"
+      (let [child (get by-name "Child")]
+        (t/is (= :leftright (:constraints-h child)))
+        (t/is (= :center (:constraints-v child)))))
+
+    (t/testing "child sizing converts, with Penpot's limitations honoured"
+      (let [child (get by-name "Child")]
+        (t/is (= :fill (:layout-item-h-sizing child)))
+        (t/is (= :auto (:layout-item-v-sizing child)))
+        (t/is (= :stretch (:layout-item-align-self child)))))))

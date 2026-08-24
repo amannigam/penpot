@@ -238,6 +238,109 @@
     (and (number? cornerRadius) (pos? cornerRadius))
     {:r1 cornerRadius :r2 cornerRadius :r3 cornerRadius :r4 cornerRadius}))
 
+;; --- constraints and auto-layout -------------------------------------------
+
+(def ^:private h-constraints
+  {"MIN" :left "MAX" :right "CENTER" :center "SCALE" :scale "STRETCH" :leftright})
+
+(def ^:private v-constraints
+  {"MIN" :top "MAX" :bottom "CENTER" :center "SCALE" :scale "STRETCH" :topbottom})
+
+(defn- constraints
+  [{:keys [constraints]}]
+  (let [h (get h-constraints (:horizontal constraints))
+        v (get v-constraints (:vertical constraints))]
+    (cond-> {}
+      (some? h) (assoc :constraints-h h)
+      (some? v) (assoc :constraints-v v))))
+
+(def ^:private justify-content
+  {"MIN" :start "CENTER" :center "MAX" :end "SPACE_BETWEEN" :space-between})
+
+(def ^:private align-items
+  {"MIN" :start "CENTER" :center "MAX" :end})
+
+(defn- layout-gap
+  "Figma keeps one spacing per axis; Penpot keeps row and column gaps, so which
+  is which depends on the direction. SPACE_BETWEEN carries the spacing itself,
+  so the gap goes to zero."
+  [{:keys [layoutMode itemSpacing counterAxisSpacing layoutWrap
+           primaryAxisAlignItems counterAxisAlignContent]}]
+  (let [primary (if (= "SPACE_BETWEEN" primaryAxisAlignItems) 0 (d/nilv itemSpacing 0))
+        counter (if (= "WRAP" layoutWrap)
+                  (if (= "SPACE_BETWEEN" counterAxisAlignContent)
+                    0
+                    (d/nilv counterAxisSpacing 0))
+                  0)]
+    (if (= "HORIZONTAL" layoutMode)
+      {:row-gap counter :column-gap primary}
+      {:row-gap primary :column-gap counter})))
+
+(defn- layout-padding
+  "Penpot misbehaves when padding exactly equals the dimension, so the plugin
+  shaves a fraction off. Same fudge, same reason."
+  [{:keys [paddingTop paddingRight paddingBottom paddingLeft] :as node}]
+  (let [{:keys [width height]} (geometry node)
+        p1 (d/nilv paddingTop 0) p2 (d/nilv paddingRight 0)
+        p3 (d/nilv paddingBottom 0) p4 (d/nilv paddingLeft 0)
+        [p1 p3] (if (and (pos? height) (= height (+ p1 p3)))
+                  [(- p1 0.0001) (- p3 0.0001)] [p1 p3])
+        [p2 p4] (if (and (pos? width) (= width (+ p2 p4)))
+                  [(- p2 0.0001) (- p4 0.0001)] [p2 p4])]
+    {:p1 p1 :p2 p2 :p3 p3 :p4 p4}))
+
+(defn- auto-layout
+  "Figma auto-layout onto Penpot flex.
+
+  The direction is reversed on purpose: Penpot orders flex children opposite
+  to Figma, so HORIZONTAL becomes row-reverse. Children are added in source
+  order, exactly as the exporter plugin does, and the reversed direction is
+  what makes the result read the same way round."
+  [{:keys [layoutMode layoutWrap primaryAxisAlignItems
+           counterAxisAlignItems counterAxisAlignContent
+           paddingTop paddingRight paddingBottom paddingLeft] :as node}]
+  (when (contains? #{"HORIZONTAL" "VERTICAL"} layoutMode)
+    (let [pad (layout-padding node)]
+      (cond-> {:layout :flex
+               :layout-flex-dir (if (= "HORIZONTAL" layoutMode) :row-reverse :column-reverse)
+               :layout-gap (layout-gap node)
+               :layout-gap-type :multiple
+               :layout-padding pad
+               :layout-padding-type (if (and (= (d/nilv paddingTop 0) (d/nilv paddingBottom 0))
+                                             (= (d/nilv paddingRight 0) (d/nilv paddingLeft 0)))
+                                      :simple :multiple)
+               :layout-justify-content (get justify-content primaryAxisAlignItems :start)
+               :layout-align-items (get align-items counterAxisAlignItems :stretch)
+               :layout-align-content (if (= "SPACE_BETWEEN" counterAxisAlignContent)
+                                       :space-between
+                                       (get align-items counterAxisAlignItems :stretch))
+               :layout-justify-items (get align-items primaryAxisAlignItems :stretch)}
+        (= "HORIZONTAL" layoutMode)
+        (assoc :layout-wrap-type (if (= "WRAP" layoutWrap) :wrap :nowrap))))))
+
+(def ^:private item-sizing {"FIXED" :fix "HUG" :auto "FILL" :fill})
+
+(defn- layout-item
+  "How a child behaves inside its parent's layout. Penpot has no equivalent of
+  hug-in-text or fill-on-a-frame, which the plugin also pins to fixed."
+  [{:keys [layoutSizingHorizontal layoutSizingVertical layoutAlign type]}]
+  (let [frame? (contains? #{"FRAME" "COMPONENT" "INSTANCE" "COMPONENT_SET"} type)
+        text?  (= "TEXT" type)
+        sizing (fn [v]
+                 (case v
+                   "HUG" (if text? :fix :auto)
+                   "FILL" (if (or frame? text?) :fix :fill)
+                   "FIXED" :fix
+                   nil))
+        h (sizing layoutSizingHorizontal)
+        v (sizing layoutSizingVertical)]
+    (cond-> {}
+      (some? h) (assoc :layout-item-h-sizing h)
+      (some? v) (assoc :layout-item-v-sizing v)
+      (some? (get align-items layoutAlign))
+      (assoc :layout-item-align-self (get align-items layoutAlign))
+      (= "STRETCH" layoutAlign) (assoc :layout-item-align-self :stretch))))
+
 (defn- base-props
   [node]
   (cond-> (merge (geometry node)
@@ -255,7 +358,10 @@
     ;; unrotated reference point, not where Figma reports it.
     (some? (rotation-props node)) (merge (rotation-props node))
     ;; Figma's locked maps to Penpot's blocked.
-    (true? (:locked node)) (assoc :blocked true)))
+    (true? (:locked node)) (assoc :blocked true)
+    (seq (constraints node)) (merge (constraints node))
+    (some? (auto-layout node)) (merge (auto-layout node))
+    (seq (layout-item node)) (merge (layout-item node))))
 
 ;; --- text ------------------------------------------------------------------
 

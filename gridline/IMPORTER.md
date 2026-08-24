@@ -52,10 +52,34 @@ Paints: SOLID becomes a fill with `:fill-color` and `:fill-opacity`. Figma
 colours are 0–1 floats per channel; Penpot wants hex plus a separate opacity.
 Gradients and images are not converted yet and are reported.
 
-## Deliberately not in the first version
+## Converted
 
-Vector geometry, components as real components, auto-layout, constraints,
-prototyping, images, gradients, blend modes beyond normal, effects.
+Geometry from `absoluteTransform` and the node's own size -- never
+`absoluteBoundingBox`, which is the post-rotation envelope. Rotation via the
+plugin's `applyInverseRotation`, storing Penpot's unrotated reference point
+plus both transform matrices.
+
+Fills and strokes (both reversed, as Figma stacks them the other way round),
+stroke alignment and dash state, corner radii as `r1..r4`, blend modes, drop
+and inner shadows, layer blur, opacity, locked.
+
+Text with its actual font family, the `gfont-<slug>` id, weight, size, style,
+line height as a ratio, letter spacing, case, decoration and alignment.
+
+Vector geometry via `?geometry=paths`, parsed by Penpot's own SVG path parser.
+Stroke-only nodes fill their stroke outline, which is what makes line art
+arrive as drawn.
+
+Images, resolved through `/v1/files/:key/images` and stored as file media.
+
+Constraints, and auto-layout as Penpot flex -- including the reversed flex
+direction, which is not a bug: Penpot orders flex children opposite to Figma,
+so the direction is inverted to compensate, exactly as the plugin does.
+
+## Still not converted
+
+Components as real components (instances flatten to boards), grid layout,
+gradients, vector networks beyond flattened path geometry, prototyping.
 
 Each unsupported node is counted and returned to the caller, so the result
 says what did not come across rather than failing silently — the honest
