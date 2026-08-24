@@ -359,3 +359,23 @@
         (t/is (= :fill (:layout-item-h-sizing child)))
         (t/is (= :auto (:layout-item-v-sizing child)))
         (t/is (= :stretch (:layout-item-align-self child)))))))
+
+(t/deftest keeps-the-file-id-across-passes
+  ;; The image flow converts twice: once to discover refs, once to resolve
+  ;; them. Both must produce the same file, or the update targets a row that
+  ;; was never inserted -- which surfaced as a file_migration foreign key
+  ;; violation, because add-file mints a fresh uuid when not given one.
+  (let [doc {:name "Two passes"
+             :document {:type "DOCUMENT"
+                        :children [{:type "CANVAS" :name "P" :children []}]}}
+        project-id (uuid/next)
+        first-pass (:file (sut/document->file doc {:project-id project-id}))
+        second-pass (:file (sut/document->file doc {:project-id project-id
+                                                    :file-id (:id first-pass)}))]
+
+    (t/testing "an explicit file-id is honoured"
+      (t/is (= (:id first-pass) (:id second-pass))))
+
+    (t/testing "and without one, a fresh id is minted -- the original bug"
+      (let [other (:file (sut/document->file doc {:project-id project-id}))]
+        (t/is (not= (:id first-pass) (:id other)))))))

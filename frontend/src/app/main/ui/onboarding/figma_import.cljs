@@ -20,6 +20,7 @@
     it produces, and tick them off as they land."
   (:require-macros [app.main.style :as stl])
   (:require
+   [app.common.data :as d]
    [app.main.data.event :as ev]
    [app.main.data.gridline.figma :as figma]
    [app.main.data.modal :as modal]
@@ -60,7 +61,7 @@
 
 (mf/defc file-row*
   {::mf/private true}
-  [{:keys [file selected done busy error on-toggle on-import]}]
+  [{:keys [file selected done busy stage report error on-toggle on-import]}]
   (let [file-key (get file :key)
         name     (get file :name)]
     [:li {:class (stl/css-case :file-row true :file-row-done done)}
@@ -77,8 +78,10 @@
         (tr "onboarding.figma-import.file-imported")]
 
        busy
-       [:> text* {:as "span" :typography t/body-small :class (stl/css :color-dimmed)}
-        (tr "onboarding.figma-import.file-importing")]
+       [:div {:class (stl/css :file-progress)}
+        [:span {:class (stl/css :spinner)}]
+        [:> text* {:as "span" :typography t/body-small :class (stl/css :color-dimmed)}
+         (or stage (tr "onboarding.figma-import.file-importing"))]]
 
        :else
        [:div {:class (stl/css :file-actions)}
@@ -92,6 +95,20 @@
              :target "_blank"
              :rel "noopener noreferrer"}
          (tr "onboarding.figma-import.open-in-figma")]])
+
+     ;; What actually came across, and what did not. Stated per file rather
+     ;; than buried, because the converter is knowingly partial.
+     (when (and done report)
+       [:> text* {:as "div" :typography t/body-small :class (stl/css :file-report)}
+        (str (:shapes report) " " (tr "onboarding.figma-import.report-shapes")
+             " \u00b7 " (:pages report) " " (tr "onboarding.figma-import.report-pages")
+             (when (pos? (d/nilv (:images-imported report) 0))
+               (str " \u00b7 " (:images-imported report) " "
+                    (tr "onboarding.figma-import.report-images")))
+             (when (seq (:unsupported report))
+               (str " \u00b7 "
+                    (reduce + (vals (:unsupported report)))
+                    " " (tr "onboarding.figma-import.report-approximated"))))])
 
      (when error
        [:> text* {:as "div" :typography t/body-small :class (stl/css :error)}
@@ -128,6 +145,8 @@
         done*      (mf/use-state #{})
         busy*      (mf/use-state #{})     ;; keys currently importing
         failed*    (mf/use-state {})      ;; key -> message
+        stage*     (mf/use-state nil)     ;; {:key .. :label ..}
+        results*   (mf/use-state {})      ;; key -> import report
 
         file-input (mf/use-ref nil)
 
@@ -198,18 +217,26 @@
            (when (and project-id @token*)
              (swap! busy* conj file-key)
              (swap! failed* dissoc file-key)
+             ;; A large file spends most of its time inside one RPC call, so
+             ;; the honest thing is to name the step we are actually on rather
+             ;; than invent a percentage.
+             (reset! stage* {:key file-key
+                             :label (tr "onboarding.figma-import.stage-reading")})
              (->> (figma/import-file {:token @token*
                                       :file-key file-key
                                       :project-id project-id
                                       :name file-name})
                   (rx/subs!
-                   (fn [_result]
+                   (fn [result]
                      (swap! busy* disj file-key)
+                     (reset! stage* nil)
+                     (swap! results* assoc file-key (:report result))
                      (swap! done* conj file-key)
                      (st/emit! (ev/event {::ev/name "onboarding-step"
                                           :label "figma-import:file-imported"})))
                    (fn [cause]
                      (swap! busy* disj file-key)
+                     (reset! stage* nil)
                      (swap! failed* assoc file-key
                             (or (some-> cause ex-data :hint)
                                 (ex-message cause)
@@ -249,7 +276,10 @@
         (mf/use-fn #(dom/click (mf/ref-val file-input)))
 
         on-skip (mf/use-fn #(finish! "skipped"))
-        on-done (mf/use-fn #(finish! "finished"))]
+        on-done (mf/use-fn #(finish! "finished"))
+        ;; Cancel used to step back to the intro, which is not what a person
+        ;; clicking Cancel on a dialog expects.
+        on-close (mf/use-fn #(finish! "closed"))]
 
     [:div {:class (stl/css :modal-overlay)}
      [:div.animated.fade-in {:class (stl/css :modal-container)}
@@ -324,7 +354,7 @@
            (if @loading*
              (tr "onboarding.figma-import.listing")
              (tr "onboarding.figma-import.connect"))]
-          [:> link* {:class (stl/css :link) :action #(reset! phase* :intro)}
+          [:> link* {:class (stl/css :link) :action on-close}
            (tr "labels.cancel")]]]
 
         :files
@@ -351,6 +381,9 @@
                                  :selected (contains? @selected* (:key file))
                                  :done (contains? @done* (:key file))
                                  :busy (contains? @busy* (:key file))
+                                 :stage (when (= (:key file) (:key @stage*))
+                                          (:label @stage*))
+                                 :report (get @results* (:key file))
                                  :error (get @failed* (:key file))
                                  :on-toggle on-toggle
                                  :on-import on-import-file}])]

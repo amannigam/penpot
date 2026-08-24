@@ -613,12 +613,16 @@
   Returns {:file <file> :report {...}}. The report is not decoration: this
   converter is partial by design and the caller shows the user what it could
   not represent."
-  [{:keys [document name]} {:keys [project-id file-name media]}]
+  [{:keys [document name]} {:keys [project-id file-name media file-id]}]
   (let [refs  (atom #{})
         pages (filter #(= "CANVAS" (:type %)) (:children document))
         state (-> (fb/create-state)
-                  (fb/add-file {:name (or file-name name "Figma import")
-                                :project-id project-id}))
+                  ;; file-id is passed on the second pass so both produce the
+                  ;; same file. Without it fb/add-file mints a fresh uuid and
+                  ;; the update targets a file that was never inserted.
+                  (fb/add-file (cond-> {:name (or file-name name "Figma import")
+                                        :project-id project-id}
+                                 (some? file-id) (assoc :id file-id))))
         state (binding [*media* (or media {})
                         *image-refs* refs]
                 (-> (reduce convert-page state pages)

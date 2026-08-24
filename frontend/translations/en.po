@@ -4878,6 +4878,26 @@ msgid "onboarding.figma-import.plugin-name"
 msgstr "Gridline Exporter"
 
 #: src/app/main/ui/onboarding/figma_import.cljs
+msgid "onboarding.figma-import.report-approximated"
+msgstr "approximated"
+
+#: src/app/main/ui/onboarding/figma_import.cljs
+msgid "onboarding.figma-import.report-images"
+msgstr "images"
+
+#: src/app/main/ui/onboarding/figma_import.cljs
+msgid "onboarding.figma-import.report-pages"
+msgstr "pages"
+
+#: src/app/main/ui/onboarding/figma_import.cljs
+msgid "onboarding.figma-import.report-shapes"
+msgstr "shapes"
+
+#: src/app/main/ui/onboarding/figma_import.cljs
+msgid "onboarding.figma-import.stage-reading"
+msgstr "Reading the file from Figma…"
+
+#: src/app/main/ui/onboarding/figma_import.cljs
 msgid "onboarding.figma-import.skip"
 msgstr "Skip for now"
 

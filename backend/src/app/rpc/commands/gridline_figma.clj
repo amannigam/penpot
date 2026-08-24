@@ -181,18 +181,20 @@
                image-refs)))
 
           ;; Second pass, now able to resolve image fills.
-          {file :file report :report}
-          (if (seq media)
-            (figma.convert/document->file document {:project-id project-id
-                                                    :file-name name
-                                                    :media media})
-            (figma.convert/document->file document {:project-id project-id
-                                                    :file-name name}))
+          {file2 :file report :report}
+          (figma.convert/document->file document
+                                        (cond-> {:project-id project-id
+                                                 :file-name name
+                                                 ;; same id as the saved file,
+                                                 ;; or the update has nothing
+                                                 ;; to update
+                                                 :file-id (:id file)}
+                                          (seq media) (assoc :media media)))
 
-          file (-> file (assoc :project-id project-id) (assoc :id (:id file)))]
+          file2 (assoc file2 :project-id project-id)]
 
       (when (seq media)
-        (bfc/update-file! (assoc cfg ::bfc/timestamp (ct/now)) file))
+        (bfc/update-file! (assoc cfg ::bfc/timestamp (ct/now)) file2))
 
       (l/inf :hint "imported figma file"
              :file-key file-key
@@ -201,6 +203,6 @@
              :images (count media)
              :unsupported (:unsupported report))
 
-      {:file-id (:id file)
-       :name (:name file)
+      {:file-id (:id file2)
+       :name (:name file2)
        :report (assoc report :images-imported (count media))})))

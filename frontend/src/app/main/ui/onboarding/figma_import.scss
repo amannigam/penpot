@@ -177,3 +177,28 @@
   gap: var(--sp-s);
   white-space: nowrap;
 }
+
+.file-progress {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-s);
+  white-space: nowrap;
+}
+
+.spinner {
+  inline-size: $sz-12;
+  block-size: $sz-12;
+  border: $b-2 solid var(--color-background-quaternary);
+  border-block-start-color: var(--color-accent-primary);
+  border-radius: $br-circle;
+  animation: gridline-spin 0.8s linear infinite;
+}
+
+@keyframes gridline-spin {
+  to { transform: rotate(360deg); }
+}
+
+.file-report {
+  grid-column: 1 / -1;
+  color: var(--color-foreground-secondary);
+}
