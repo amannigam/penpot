@@ -22,6 +22,7 @@
   (:require
    [app.main.data.event :as ev]
    [app.main.data.gridline.figma :as figma]
+   [app.main.data.modal :as modal]
    [app.main.data.profile :as du]
    [app.main.refs :as refs]
    [app.main.store :as st]
@@ -100,6 +101,8 @@
 ;; ---------------------------------------------------------------------------
 
 (mf/defc figma-import-modal*
+  {::mf/register modal/components
+   ::mf/register-as :gridline-figma-import}
   []
   (let [team      (mf/deref refs/team)
         projects  (mf/deref refs/projects)

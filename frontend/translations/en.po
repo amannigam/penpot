@@ -689,6 +689,10 @@ msgstr ""
 msgid "dashboard.go-to-admin-console"
 msgstr "Go to Admin Console"
 
+#: src/app/main/ui/dashboard/project_menu.cljs
+msgid "dashboard.import-from-figma"
+msgstr "Import from Figma"
+
 #: src/app/main/ui/dashboard/import.cljs:463, src/app/main/ui/dashboard/project_menu.cljs:109
 msgid "dashboard.import"
 msgstr "Import Gridline files"

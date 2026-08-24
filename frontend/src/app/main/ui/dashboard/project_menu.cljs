@@ -8,6 +8,7 @@
   (:require
    [app.main.data.common :as dcm]
    [app.main.data.dashboard :as dd]
+   [app.config :as cf]
    [app.main.data.modal :as modal]
    [app.main.data.notifications :as ntf]
    [app.main.refs :as refs]
@@ -83,6 +84,9 @@
         (mf/use-fn
          (fn [] (when (fn? on-import) (on-import))))
 
+        on-import-figma
+        (mf/use-fn #(st/emit! (modal/show {:type :gridline-figma-import})))
+
         options
         [(when-not (:is-default project)
            {:name   (tr "labels.rename")
@@ -109,6 +113,13 @@
            {:name    (tr "dashboard.import")
             :id      "file-import"
             :handler on-import-files})
+
+         ;; Gridline: the onboarding step is shown once, so the importer needs
+         ;; a permanent home as well.
+         (when (contains? cf/flags :gridline-figma-onboarding)
+           {:name    (tr "dashboard.import-from-figma")
+            :id      "figma-import"
+            :handler on-import-figma})
          (when-not (:is-default project)
            {:name :separator})
          (when-not (:is-default project)

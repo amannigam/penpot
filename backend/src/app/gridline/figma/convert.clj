@@ -18,7 +18,9 @@
   (:require
    [app.common.data :as d]
    [app.common.files.builder :as fb]
+   [app.common.geom.point :as gpt]
    [app.common.logging :as l]
+   [app.common.types.path :as path]
    [app.common.uuid :as uuid]
    [cuerdas.core :as str]))
 
@@ -113,9 +115,57 @@
 ;; --- nodes -----------------------------------------------------------------
 
 (def ^:private board-types #{"FRAME" "COMPONENT" "COMPONENT_SET" "INSTANCE" "SECTION"})
+
+;; Anything Figma can describe as geometry. Requesting the document with
+;; ?geometry=paths gives these nodes fillGeometry/strokeGeometry as SVG path
+;; data, which Penpot can parse directly -- so they convert properly rather
+;; than becoming placeholders.
+(def ^:private geometry-types
+  #{"VECTOR" "STAR" "REGULAR_POLYGON" "BOOLEAN_OPERATION" "LINE" "ELLIPSE"
+    "RECTANGLE"})
+
 (def ^:private placeholder-types
-  #{"VECTOR" "STAR" "REGULAR_POLYGON" "BOOLEAN_OPERATION" "SLICE" "CONNECTOR"
-    "STICKY" "SHAPE_WITH_TEXT" "WASHI_TAPE" "TABLE"})
+  #{"SLICE" "CONNECTOR" "STICKY" "SHAPE_WITH_TEXT" "WASHI_TAPE" "TABLE"})
+
+(defn- geometry->content
+  "Figma path data is in the node's own coordinate space; Penpot positions
+  path content in absolute page coordinates, so it is translated by the node
+  origin. Several subpaths concatenate into one path string."
+  [geoms {:keys [x y]}]
+  (let [d (->> geoms (keep :path) (remove str/blank?) (str/join " "))]
+    (when-not (str/blank? d)
+      (-> (path/from-string d)
+          (path/move-content (gpt/point x y))))))
+
+(defn- add-path-shape
+  "Builds a :path shape from Figma geometry.
+
+  strokeGeometry is already the outlined stroke, so when a node has no fill
+  geometry the stroke outline is filled with the stroke colour -- that is what
+  makes thin line art (arrows, icons) come through as the shape you drew
+  rather than as a block."
+  [state node props]
+  (let [origin (select-keys props [:x :y])
+        fill-content (geometry->content (:fillGeometry node) origin)
+        stroke-content (geometry->content (:strokeGeometry node) origin)
+        stroke-fills (paints->fills (:strokes node))]
+    (cond
+      (some? fill-content)
+      (fb/add-shape state (-> props
+                              (assoc :type :path)
+                              (assoc :content fill-content)))
+
+      (some? stroke-content)
+      (fb/add-shape state (-> props
+                              (assoc :type :path)
+                              (assoc :content stroke-content)
+                              (assoc :fills (if (seq stroke-fills)
+                                              stroke-fills
+                                              [{:fill-color "#000000"
+                                                :fill-opacity 1}]))
+                              (dissoc :strokes)))
+
+      :else nil)))
 
 (declare convert-node)
 
@@ -152,6 +202,19 @@
       (let [state (-> state (fb/add-group (base-props node)) (convert-children node))]
         (-> state (fb/close-group) (count-shape)))
 
+      ;; Prefer real geometry when Figma gave us any. A rectangle with a
+      ;; corner radius is still better as a rect, so those keep their own
+      ;; branch below and only fall here when they carry path data.
+      (and (contains? geometry-types type)
+           (or (seq (:fillGeometry node)) (seq (:strokeGeometry node)))
+           (not (contains? #{"RECTANGLE" "ELLIPSE"} type)))
+      (if-let [state' (add-path-shape state node (base-props node))]
+        (count-shape state')
+        (-> state
+            (fb/add-shape (assoc (base-props node) :type :rect))
+            count-shape
+            (note-unsupported! node)))
+
       (= "RECTANGLE" type)
       (-> state (fb/add-shape (assoc (base-props node) :type :rect)) count-shape)
 
@@ -177,11 +240,18 @@
             count-shape))
 
       (contains? placeholder-types type)
-      ;; Represented as a rectangle carrying the original fills, so the layout
-      ;; still reads correctly, and counted so the caller can say what was
-      ;; approximated.
+      ;; An outline, not a filled block. Inheriting the original fill made
+      ;; unconvertible art import as solid rectangles, which reads as a broken
+      ;; import rather than a gap. Counted, so the caller can say so too.
       (-> state
-          (fb/add-shape (assoc (base-props node) :type :rect))
+          (fb/add-shape (-> (base-props node)
+                            (assoc :type :rect)
+                            (assoc :fills [])
+                            (assoc :strokes [{:stroke-color "#b1b2b5"
+                                              :stroke-opacity 1
+                                              :stroke-width 1
+                                              :stroke-style :dotted
+                                              :stroke-alignment :center}])))
           count-shape
           (note-unsupported! node))
 

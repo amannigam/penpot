@@ -108,3 +108,56 @@
     (t/testing "unsupported nodes are reported, not dropped silently"
       (t/is (= 1 (get-in report [:unsupported "VECTOR"])))
       (t/is (nil? (:failed report))))))
+
+(def ^:private vector-document
+  "Figma returns fillGeometry/strokeGeometry only when the document is
+  requested with ?geometry=paths, which the client does."
+  {:name "Vectors"
+   :document
+   {:type "DOCUMENT"
+    :children
+    [{:type "CANVAS" :name "Art"
+      :children
+      [{:type "VECTOR" :name "Filled"
+        :absoluteBoundingBox {:x 100 :y 50 :width 20 :height 20}
+        :fills [{:type "SOLID" :color {:r 0 :g 0 :b 0 :a 1}}]
+        :fillGeometry [{:path "M0 0 L20 0 L10 20 Z" :windingRule "NONZERO"}]}
+       {:type "VECTOR" :name "Stroked"
+        :absoluteBoundingBox {:x 200 :y 60 :width 30 :height 4}
+        :strokes [{:type "SOLID" :color {:r 1 :g 0 :b 0 :a 1}}]
+        :strokeGeometry [{:path "M0 0 L30 0 L30 4 L0 4 Z"}]}
+       {:type "SLICE" :name "Slice"
+        :absoluteBoundingBox {:x 0 :y 0 :width 5 :height 5}}]}]}})
+
+(t/deftest converts-vector-geometry
+  (let [{:keys [file report]} (sut/document->file vector-document
+                                                  {:project-id (uuid/next)})
+        page-id (first (get-in file [:data :pages]))
+        objects (get-in file [:data :pages-index page-id :objects])
+        by-name (into {} (map (juxt :name identity)) (vals objects))]
+
+    (t/testing "a filled vector becomes a real path, not a placeholder"
+      (let [shape (get by-name "Filled")]
+        (t/is (= :path (:type shape)))
+        (t/is (some? (:content shape)))
+        (t/testing "translated from node-local to absolute page coordinates"
+          (t/is (= 100.0 (double (get-in shape [:selrect :x]))))
+          (t/is (= 50.0 (double (get-in shape [:selrect :y]))))
+          (t/is (= 20.0 (double (get-in shape [:selrect :width])))))))
+
+    (t/testing "a stroke-only vector is filled with its stroke colour"
+      ;; strokeGeometry is the outlined stroke, so filling it is what makes
+      ;; thin line art -- arrows, icons -- render as drawn.
+      (let [shape (get by-name "Stroked")]
+        (t/is (= :path (:type shape)))
+        (t/is (some? (:content shape)))
+        (t/is (= "#ff0000" (:fill-color (first (:fills shape)))))))
+
+    (t/testing "geometry-less nodes are outlines, never filled blocks"
+      (let [shape (get by-name "Slice")]
+        (t/is (= :rect (:type shape)))
+        (t/is (empty? (:fills shape)))
+        (t/is (seq (:strokes shape)))))
+
+    (t/testing "only the genuinely unconvertible node is reported"
+      (t/is (= {"SLICE" 1} (:unsupported report))))))

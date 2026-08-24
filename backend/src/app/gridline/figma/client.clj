@@ -45,11 +45,15 @@
 (defn get-file
   "GET /v1/files/:key -- the whole document tree.
 
+  geometry=paths is what makes vector art convertible: without it Figma
+  returns no fillGeometry/strokeGeometry and every icon, arrow and drawn shape
+  can only become a placeholder.
+
   Requires the file_content:read scope. `depth` is deliberately not set: we
   want every node, and Figma returns the full tree by default."
   [cfg token file-key]
   (l/inf :hint "fetching figma file" :file-key file-key)
-  (request cfg token (str "/v1/files/" file-key)))
+  (request cfg token (str "/v1/files/" file-key "?geometry=paths")))
 
 (defn get-file-meta
   "Cheap metadata call, used to name the file and to fail early on a bad key
